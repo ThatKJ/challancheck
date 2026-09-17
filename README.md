@@ -1,19 +1,17 @@
-# KiranaSync (First Commit Hackathon)
+# ChallanCheck (First Commit Hackathon)
 
 ## Elevate Pitch
-Snap a photo of a wholesale invoice and instantly digitize it into your inventory using AWS AI.
+ChallanCheck audits whether the photographic evidence attached to an e-challan is actually consistent with the claimed violation.
 
 ## The Problem
-Small retail shop owners in India spend hours manually entering items from wholesale invoices into inventory or accounting software, which is time-consuming and error-prone.
+Automated traffic cameras can issue incorrect e-Challans (e.g. fining a car driver for "no helmet"). Disputing them requires manually analyzing evidence and navigating a bureaucratic grievance portal.
 
 ## What We Built
-**KiranaSync** is a web app where a user uploads a photo of a physical bill, and it automatically structures the line items into a digital inventory table.
+**ChallanCheck** is an Evidence Consistency Engine. The user uploads a screenshot of the e-Challan and its evidence photo. The app extracts visual facts and uses deterministic rules to identify mismatches (like "Car vs Helmet violation"), preparing a structured grievance packet.
 
 ## AWS Integration
-- **Amazon Textract (AnalyzeExpense)**: Extracts raw text and standard fields from messy, handwritten, or printed invoices.
-- **Amazon Bedrock**: Parses unstructured/semi-structured extractions into a clean JSON array (name, quantity, price).
-- **AWS Lambda & API Gateway**: Serverless backend pipeline.
-- **DynamoDB**: Stores the resulting structured inventory.
+- **Amazon Bedrock**: Performs multimodal visual observation on the traffic camera evidence to extract structured facts (vehicle type, helmet presence) WITHOUT making legal judgements.
+- **AWS Lambda / API Gateway**: Serverless backend for the rule engine.
 
 ## Setup & Running Locally
 
@@ -21,4 +19,4 @@ Small retail shop owners in India spend hours manually entering items from whole
 
 ## AI Tools Used
 - Antigravity AI agents used for product ideation, task management, code generation, and verification.
-- Amazon Bedrock used for core product feature (data structuring).
+- Amazon Bedrock used for multimodal image observation.

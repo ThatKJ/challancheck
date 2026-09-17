@@ -1,9 +1,12 @@
 # Demo Video Plan (Max 3 Minutes)
 
-- **0:00–0:20 (Problem + User)**: Show a physical wholesale invoice and a ledger. "Small shop owners in India spend hours manually entering inventory."
-- **0:20–0:40 (Input)**: Introduce the app. "We built an app that digitizes this instantly." Show the upload interface.
-- **0:40–1:50 (Real Workflow executing)**: Upload the invoice. Show a clear loading state (maybe hinting at AWS Textract/Bedrock).
-- **1:50–2:20 (Strong Result / Payoff)**: The screen populates with a clean digital table. Show editing a field just in case it's slightly off.
-- **2:20–2:40 (AWS Architecture)**: Quick diagram/explanation: React -> API Gateway -> Lambda -> Textract -> Bedrock.
-- **2:40–2:55 (Technical Challenge)**: "The hardest part was parsing messy Indian wholesale invoices; Bedrock's structuring made it perfect."
-- **2:55–3:00 (Closing frame)**: Team info, Hackathon name.
+- **0:00–0:20 (Problem)**: "This challan says: No Helmet. But this is the attached evidence." Show a car.
+- **0:20–0:40 (Action)**: Click Audit Evidence in ChallanCheck.
+- **0:40–1:50 (Execution)**: Show Evidence consistency check running.
+- **1:50–2:20 (Payoff)**: Display:
+  - Violation: Driving without helmet
+  - Observed: Passenger car
+  - Mismatch: Vehicle category appears inconsistent with the cited violation.
+  - Confidence: High
+- **2:20–2:40 (AWS Architecture)**: Bedrock multimodal processing observes facts -> Deterministic rules evaluate conflicts.
+- **2:40–3:00 (Closing)**: Generate grievance packet. Click "Open official grievance portal".

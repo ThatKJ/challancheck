@@ -1,13 +1,36 @@
-# Product Decision
+# Product Decision — PROVISIONAL LOCK
 
-- **User**: Small retail business owner in India (e.g., Kirana store).
-- **Problem**: Manually entering items from wholesale invoices into inventory or accounting software takes hours and is error-prone.
-- **Product**: A simple web app where the owner uploads a photo of a wholesale bill and it automatically structures the line items into digital inventory.
-- **One-sentence pitch**: Snap a photo of an invoice and instantly digitize it into your inventory using AWS Textract and Bedrock.
-- **Primary input**: An image (JPG/PNG) of a wholesale invoice.
-- **Primary pipeline**: Frontend (React) -> AWS API Gateway -> Lambda -> AWS Textract (extract raw text) -> Amazon Bedrock (structure into JSON) -> DynamoDB (save).
-- **Primary output**: A clean, editable data table showing item names, quantities, and prices.
-- **Why AWS is necessary/useful**: AWS Textract is uniquely suited for document extraction, and Amazon Bedrock provides the LLM capability to parse messy OCR data into clean JSON.
-- **Demo wow moment**: Uploading a crumpled, messy physical invoice and watching it perfectly populate a clean inventory table in seconds.
-- **Explicit non-goals**: Full accounting software, tax calculation, multi-tenant complex login.
-- **Biggest technical risk**: Handling messy handwriting or low-quality photos, and API latency during the live pipeline.
+## User
+Indian driver who received an automated e-Challan (traffic ticket).
+
+## Problem
+Automated traffic cameras frequently issue incorrect e-Challans (e.g., fining a car driver for "no helmet", or misidentifying a license plate). Disputing them requires manually analyzing the evidence photo and navigating a bureaucratic grievance portal.
+
+## Product: ChallanCheck
+An Evidence Consistency Engine that audits whether the photographic evidence attached to an e-challan is consistent with the violation being claimed.
+
+## One-Sentence Pitch
+ChallanCheck audits whether the photographic evidence attached to an e-challan is actually consistent with the claimed violation.
+
+## Primary Input
+A screenshot or PDF of the e-Challan, including the traffic camera's "evidence" photo and the claimed violation text.
+
+## Primary Pipeline
+Upload -> Extract violation + metadata -> Extract attached evidence image -> Amazon Bedrock multimodal analysis -> Structured observations -> Deterministic compatibility rules -> Evidence Consistency Report -> Grievance-ready evidence packet.
+
+## Role of AWS
+Amazon Bedrock multimodal processing (Claude 3) acts as the visual observer. It extracts structured facts from the image (e.g., vehicle type, helmet presence) without making legal judgements. 
+
+## Demo Wow Moment
+"This challan says: No Helmet. But this is the attached evidence." -> Shows a car.
+Click "Audit Evidence".
+The app observes "Passenger car" and the deterministic engine flags: "Mismatch: Vehicle category appears inconsistent with the cited violation."
+Generates a grievance packet with a button to "Open official grievance portal".
+
+## Explicit Non-Goals
+- DO NOT act as an AI lawyer.
+- DO NOT make legal guilt/innocence decisions.
+- DO NOT try to connect directly to the government database (uploading screenshots is safer).
+
+## Safety / Truth Rule
+The AI only observes visual facts. The application code (deterministic rules) decides if those facts conflict with the violation claim. If the image is too blurry, the system explicitly outputs "INSUFFICIENT EVIDENCE".

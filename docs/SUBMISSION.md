@@ -1,12 +1,10 @@
 # Submission Narrative
 
-**Problem**: Small retail shop owners in India spend excessive time on manual data entry from wholesale invoices into their local inventory ledgers, leading to errors and wasted time.
-**Build**: A web application that takes an image of an invoice and automatically converts it into a structured digital inventory list.
+**Problem**: Automated traffic cameras can issue incorrect e-Challans (e.g. fining a car driver for "no helmet"). Disputing them requires manually analyzing evidence and navigating a bureaucratic grievance portal.
+**Build**: ChallanCheck is an Evidence Consistency Engine that audits whether the photographic evidence attached to an e-challan is actually consistent with the claimed violation.
 **AWS Usage**: 
-- **Amazon Textract**: Extracts raw text from the uploaded invoice image.
-- **Amazon Bedrock**: Parses the unstructured text into a clean JSON array of items (name, quantity, price).
-- **AWS Lambda & API Gateway**: Connects the frontend to the AI services.
+- **Amazon Bedrock**: Performs multimodal visual observation on the traffic camera evidence, extracting structured facts (vehicle type, helmet presence) which are then fed into a deterministic compatibility rule engine.
 
 **AI Disclosure**:
 - Used Antigravity AI agents for product ideation, task management, and code generation.
-- Used Amazon Bedrock (via API) for core product functionality.
+- Used Amazon Bedrock for multimodal image observation.
