@@ -2,8 +2,9 @@
 
 | Task | Priority | Owner | Status | Dependency | Verification |
 |------|----------|-------|--------|------------|--------------|
-| Setup project structure (React + Node) | P0 | Agent 2 | TODO | None | Repo has working boilerplate |
-| Create AWS Architecture (CDK/SAM or manual script) | P0 | Agent 2 | TODO | Setup | AWS resources defined |
+| Provide AWS Credentials | P0 | Human | BLOCKED | None | Secrets injected into env |
+| Setup project structure (React + Node) | P0 | Agent 2 | IN_PROGRESS | None | Repo has working boilerplate |
+| Create AWS Architecture (CDK/SAM or manual script) | P0 | Agent 2 | IN_PROGRESS | Setup | AWS resources defined |
 | Implement Textract + Bedrock Lambda | P0 | Agent 2 | TODO | AWS Arch | Lambda can process a test image and output JSON |
 | Implement Frontend upload & display | P0 | Agent 2 | TODO | Setup | Can upload image and show dummy data table |
 | Integrate Frontend with API Gateway | P0 | Agent 2 | TODO | Frontend, Lambda | End-to-end flow works with real image |
