@@ -507,3 +507,20 @@ STATUS CHECK on the AWS poll (still running in background from the previous entr
 
 BLOCKERS:
 Same as above — Bedrock invocation account-gated, AWS-side.
+
+## 01:05 (2026-09-19) — BUILD
+
+TASK:
+AWS Bedrock unblock check, ~2 hours after first hitting the account-verification gate (first poll: 20 min, second poll: 90 min, both timed out; fresh manual check right now still fails identically).
+
+STATUS:
+`bedrock-runtime converse` still returns `ValidationException: Operation not allowed`, unchanged, on account 623234913135, both regions tested, both Anthropic and Amazon models, both CLI and console UI. This crosses the exact threshold AWS's own original error message named ("If you are still receiving this message after more than 2 hours, please let us know by writing to aws-verification@amazon.com").
+
+DECISION:
+Flagging this to the human now as a genuine account-verification action point (their call whether to email AWS or just wait longer) rather than silently polling forever. Started a third, much lower-frequency background poll (10 min interval, up to ~4 hours) in case it clears passively — this costs nothing and doesn't need permission, so not blocking on a reply to keep running it.
+
+NEXT:
+Waiting for either: (a) the poll to succeed on its own, (b) the human to escalate via AWS support and report back, or (c) further instruction. Nothing else non-blocked and in-scope remains for BUILD right now — frontend is Astra's, RED-009/RED-003/RED-011 are already fixed and committed, and P0-02/P0-07 are both waiting on this exact gate.
+
+BLOCKERS:
+Bedrock invocation account-gated ~2 hours now. Human-relevant: optional escalation via aws-verification@amazon.com if they want to expedite; otherwise this may just need more time.
