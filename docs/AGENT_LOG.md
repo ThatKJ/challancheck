@@ -491,3 +491,19 @@ Will check the poll result and retry manually if it hasn't self-reported. If Bed
 
 BLOCKERS:
 Bedrock invocation still account-gated (AWS-side, not human-actionable right now — no pending click, payment, or MFA). Not P0-01 in the old sense (creds exist now) — this is a new, narrower blocker one level deeper.
+
+## 23:35 — BUILD
+
+TASK:
+Human transferred frontend ownership to Agent 4 (Astra), effective immediately, ahead of the UI_READY gate. Recorded it.
+
+CHANGED:
+docs/AI_COORDINATION.md — BUILD's ownership list no longer includes frontend/; Agent 4's section rewritten to own all of frontend/ now (not gated on UI_READY, which stays `false` and still tracks the real live-Bedrock condition for demo/submission purposes, just no longer blocks Astra's ownership); UI Gate section marked superseded-for-ownership with the date and reason; Git and Branch Coordination's Agent 4 line updated to match.
+
+GOING FORWARD:
+BUILD stops touching frontend/ entirely except to fix breakage from a backend contract change BUILD makes (e.g. a renamed export or changed response shape) — never for redesign/styling. Any frontend idea BUILD has gets logged here for Astra, not implemented. Backend/API contracts (observation schema, rule engine RESULTS, auditEvidence()/classifyViolation() shapes) stay exactly as documented in this file's Protected Interfaces/Architecture Contract sections — Astra should treat those as fixed unless this file changes.
+
+STATUS CHECK on the AWS poll (still running in background from the previous entry): still failing at the last check, same `ValidationException: Operation not allowed`. Continuing to monitor; will report the moment it resolves or times out.
+
+BLOCKERS:
+Same as above — Bedrock invocation account-gated, AWS-side.

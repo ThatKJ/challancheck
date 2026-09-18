@@ -70,14 +70,24 @@ AGENT 2 — BUILD
 Owns:
 
 backend/
-frontend/
 infra/
 scripts/
 tests/
 
+Does NOT own frontend/ as of 2026-09-18 (human-ordered transfer to Agent 4 —
+see AGENT 4 section below; this transfer happened ahead of the UI_READY gate
+by direct human instruction, not because the gate condition was met).
+
 May update TASK_BOARD evidence.
 
 Owns AWS integration and implementation.
+
+If a backend/API contract change would affect the frontend, BUILD documents
+it here (Protected Interfaces / Architecture Contract) instead of touching
+frontend/ directly, and logs the needed change in AGENT_LOG for Agent 4 to
+pick up. The one exception: BUILD may fix frontend/ code only to the extent
+required to keep it compiling/working against a contract BUILD changed
+(e.g. a renamed export), never for redesign or styling.
 
 ---
 
@@ -95,23 +105,30 @@ Must not rewrite core implementation unless explicitly tasked.
 
 ---
 
-AGENT 4 — UI
+AGENT 4 — UI (Astra)
 
-Owns frontend presentation only after UI_READY=true.
+Owns frontend/ as of 2026-09-18 (human-ordered transfer; the UI_READY gate
+below is superseded for the purpose of who owns the directory, but the gate's
+underlying concern — don't polish a UI around an unproven AWS call — still
+stands as guidance, not a hard block, now that a human has decided to proceed
+anyway).
 
 May edit:
 
-frontend/components/
-frontend/styles/
-frontend/pages/ or app/
+frontend/ (all of it — components, styles, pages/app, App.jsx, vite config)
 
 Must NOT change:
 
-backend logic
-AWS integration
-rule engine semantics
-observation schema
-API contracts
+backend logic (backend/)
+AWS integration (backend/src/bedrockAdapter.js, backend/src/fixtureAdapter.js)
+rule engine semantics (backend/src/ruleEngine.js)
+observation schema (backend/src/observationSchema.js)
+API contracts (the function signatures/shapes documented under Protected
+Interfaces and Architecture Contract in this file)
+
+If Astra needs a backend/contract change to support a UI idea, request it
+here (AGENT_LOG) rather than changing backend/ directly — BUILD implements
+contract changes to keep the schema/rule-engine ownership boundary clean.
 
 ## Protected Interfaces
 
@@ -201,7 +218,7 @@ No P3 work while actionable P0/P1 exists.
 
 UI_READY=false
 
-Agent 4 may not begin until Agent 2 proves:
+Original rule: Agent 4 may not begin until Agent 2 proves:
 
 input
 → Bedrock
@@ -210,6 +227,13 @@ input
 → visible useful result
 
 and Agent 3 confirms no unresolved P0 in the core flow.
+
+SUPERSEDED 2026-09-18 for ownership purposes: the human directly ordered
+frontend ownership transferred to Agent 4 (Astra) ahead of this gate opening
+(live Bedrock still hasn't succeeded — see P0-01/P0-02 in TASK_BOARD.md).
+UI_READY itself stays `false` until the real condition above is met — that
+flag is still meaningful for judging demo/submission readiness — but it no
+longer blocks Agent 4 from owning and editing frontend/.
 
 ## Communication Rule
 
@@ -233,7 +257,7 @@ To avoid simultaneous uncontrolled editing:
 - **Agent 1 (LEAD)**: Stays mostly read-only on `main`, edits `docs/`.
 - **Agent 2 (BUILD)**: Owns the actual implementation branch (e.g., `agent/build` or `main`).
 - **Agent 3 (RED TEAM)**: Reads BUILD's branch frequently, only commits to `tests/` and `docs/QA_REPORT.md`.
-- **Agent 4 (UI)**: Starts only after UI Gate opens, edits frontend presentation files.
+- **Agent 4 (UI/Astra)**: Owns `frontend/` as of 2026-09-18 (human-ordered, ahead of UI Gate — see UI Gate section). Edits frontend freely; does not touch `backend/`.
 
 Do not make broad code changes simultaneously across agents.
 
