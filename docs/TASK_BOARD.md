@@ -1,12 +1,34 @@
 # Task Board
 
-| Task | Priority | Owner | Status | Dependency | Verification |
-|------|----------|-------|--------|------------|--------------|
-| Minimal Bedrock Multimodal Spike | P0 | Agent 2 | TODO | None | Script successfully extracts structured JSON from 5 diverse traffic images |
-| Provide AWS Credentials | P0 | Human | BLOCKED | None | Secrets injected into env |
-| Implement Bedrock rules engine | P1 | Agent 2 | TODO | Spike | Deterministic rules flag mismatches |
-| Implement Frontend upload & display | P1 | Agent 2 | TODO | Engine | Can upload image and show Evidence Consistency Report |
-| Security check (no leaked credentials) | P0 | Agent 3 | TODO | End-to-end | No secrets in git, IAM least privilege |
-| Test failure states (bad image, ambiguous) | P1 | Agent 3 | TODO | End-to-end | App shows INSUFFICIENT EVIDENCE |
-| Record 3-minute demo video | P0 | Human | TODO | Frontend | Video file ready |
-| Finalize README & Submission | P0 | Agent 1 | TODO | Video ready | README matches final metrics |
+## P0
+
+| ID | Task | Owner | Status | Evidence |
+|---|---|---|---|---|
+| P0-01 | Verify AWS credentials/model access | BUILD | IN_PROGRESS | |
+| P0-02 | Bedrock multimodal spike | BUILD | TODO | |
+| P0-03 | Observation schema validation | BUILD | TODO | |
+| P0-04 | Core deterministic rule engine | BUILD | TODO | |
+| P0-05 | Adversarial rule audit | REDTEAM | TODO | |
+| P0-06 | Secret/security scan | REDTEAM | TODO | |
+| P0-07 | Core E2E workflow | BUILD | TODO | |
+
+## P1
+
+| ID | Task | Owner | Status | Evidence |
+|---|---|---|---|---|
+| P1-01 | Upload screenshot/PDF | BUILD | TODO | |
+| P1-02 | Violation extraction | BUILD | TODO | |
+| P1-03 | Evidence crop/extraction | BUILD | TODO | |
+| P1-04 | Side-by-side result | BUILD | TODO | |
+| P1-05 | Failure states | BUILD | TODO | |
+| P1-06 | Deployment | BUILD | TODO | |
+| P1-07 | Demo narrative | LEAD | TODO | |
+| P1-08 | Claim audit | REDTEAM | TODO | |
+
+## P2
+
+| ID | Task | Owner | Status | Evidence |
+|---|---|---|---|---|
+| P2-01 | Evidence PDF | BUILD | TODO | |
+| P2-02 | Visual highlighting | UI | BLOCKED | UI_READY=false |
+| P2-03 | Motion/polish | UI | BLOCKED | UI_READY=false |
