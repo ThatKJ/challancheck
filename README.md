@@ -6,12 +6,12 @@ ChallanCheck audits whether the photographic evidence attached to an e-challan i
 ## The Problem
 Automated traffic cameras can issue incorrect e-Challans (e.g. fining a car driver for "no helmet"). Disputing them requires manually analyzing evidence and navigating a bureaucratic grievance portal.
 
-## What We Built
-**ChallanCheck** is an Evidence Consistency Engine. The user uploads a screenshot of the e-Challan and its evidence photo. The app extracts visual facts and uses deterministic rules to identify mismatches (like "Car vs Helmet violation"), preparing a structured grievance packet.
+## What We Are Building
+**ChallanCheck** is planned to be an Evidence Consistency Engine. The user will upload a screenshot of the e-Challan and its evidence photo. The app will extract visual facts and use deterministic rules to identify mismatches (like "Car vs Helmet violation"), preparing a structured grievance packet.
 
-## AWS Integration
-- **Amazon Bedrock**: Performs multimodal visual observation on the traffic camera evidence to extract structured facts (vehicle type, helmet presence) WITHOUT making legal judgements.
-- **AWS Lambda / API Gateway**: Serverless backend for the rule engine.
+## Planned AWS Integration
+- **Amazon Bedrock**: Will perform multimodal visual observation on the traffic camera evidence to extract structured facts (vehicle type, helmet presence) WITHOUT making legal judgements.
+- **AWS Lambda / API Gateway**: Will act as the serverless backend for the rule engine.
 
 ## Setup & Running Locally
 

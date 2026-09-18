@@ -4,7 +4,7 @@
 Indian driver who received an automated e-Challan (traffic ticket).
 
 ## Problem
-Automated traffic cameras frequently issue incorrect e-Challans (e.g., fining a car driver for "no helmet", or misidentifying a license plate). Disputing them requires manually analyzing the evidence photo and navigating a bureaucratic grievance portal.
+Automated traffic cameras can issue incorrect e-Challans (e.g., fining a car driver for "no helmet", or misidentifying a license plate). Disputing them requires manually analyzing the evidence photo and navigating a bureaucratic grievance portal.
 
 ## Product: ChallanCheck
 An Evidence Consistency Engine that audits whether the photographic evidence attached to an e-challan is consistent with the violation being claimed.

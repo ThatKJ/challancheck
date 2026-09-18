@@ -44,8 +44,8 @@ Expected: Clone → install → run, with secrets impossible to commit by defaul
 Actual: Setup audit is MIXED. PASS: no secrets in tracked files or history (`AKIA`/`aws_secret`/`.env` searches empty), `node_modules` untracked, frontend `npm run build` succeeds (vite 8.3.0, 222ms). FAIL/GAP: (a) README setup section is a stub ("To be updated by Agent 2") — no reproducible product setup exists. (b) No root `.gitignore` — only `frontend/.gitignore` — so a future `backend/.env` or credential file at root has no ignore protection. Given P0-01 will soon inject real AWS secrets into env, this gap is time-sensitive.
 Reproduction: `git log --all -S 'AKIA' -- .` (empty); `ls -a` (no root .gitignore); README:16-18 stub; `npm run build` in `frontend/` (pass).
 Evidence: 23 tracked files, none matching `\.env|credential|secret|pem|key`.
-Recommended smallest fix: LEAD/BUILD add root `.gitignore` (`*.env*`, `*.pem`, `aws-credentials*`, `dist/`, `node_modules/`) BEFORE secrets arrive; BUILD documents setup when P0-02 lands. Reusable scanner: `scripts/verification/secret_scan.sh`.
-Status: OPEN (scan clean; gaps open)
+Recommended smallest fix: ~~LEAD/BUILD add root `.gitignore`~~ DONE in working tree (covers `node_modules/`, `.env*`, `*.pem`, `*credentials*`; secret_scan.sh exits 0). Remaining: BUILD documents setup when P0-02 lands.
+Status: PARTLY CLOSED (hygiene clean; setup docs still open)
 
 ## ID: RED-005
 Severity: P1
@@ -55,7 +55,7 @@ Actual: No engine exists to attack, so this audit pre-registers the adversarial 
 Reproduction: n/a (engine absent) — matrix is executable once `RULES` module lands; see file header for runner contract.
 Evidence: `tests/adversarial/rule_expectations.json` (new, REDTEAM-owned).
 Recommended smallest fix: BUILD implements P0-04 against this matrix; REDTEAM retests on landing (do not assume the fix works).
-Status: OPEN — preliminary 14/14 vs BUILD's uncommitted engine 2026-09-18 (bus entry below); formal retest only when BUILD commits + claims P0-04.
+Status: CLOSED 2026-09-18 — independently verified, trusting no summary: (a) matrix re-run via plain node: 14/14; (b) `npm test`: 22/22 (14 live-matrix runner `tests/redteam-matrix.test.js` reading the canonical JSON at test time — no vendored copy — plus 8 BUILD unit tests); (c) `validateObservation` never-throws probe 6/6 garbage inputs → valid=false; (d) engine imports nothing but the schema module (no network; Product Truth holds for this file). Residual risk (not a finding): confident multi-vehicle misclassification would live observation-side — attack at P0-02 spike with real fixtures.
 
 ## ID: RED-006
 Severity: P2
