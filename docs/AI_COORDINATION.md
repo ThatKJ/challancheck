@@ -203,4 +203,33 @@ immediately select next task
 
 Never assume another agent's summary is true.
 
-Repository state and live behavior outrank prose.
+## Git and Branch Coordination
+
+To avoid simultaneous uncontrolled editing:
+- **Agent 1 (LEAD)**: Stays mostly read-only on `main`, edits `docs/`.
+- **Agent 2 (BUILD)**: Owns the actual implementation branch (e.g., `agent/build` or `main`).
+- **Agent 3 (RED TEAM)**: Reads BUILD's branch frequently, only commits to `tests/` and `docs/QA_REPORT.md`.
+- **Agent 4 (UI)**: Starts only after UI Gate opens, edits frontend presentation files.
+
+Do not make broad code changes simultaneously across agents.
+
+## Final Merge/Freeze Sequence
+
+Near submission, feature development must stop and follow this mechanical sequence:
+
+1. **BUILD FREEZE**
+2. Merge working implementation to main.
+3. Run full tests.
+4. Red Team final audit.
+5. Fix ONLY P0/P1 issues.
+6. **Canonical Run**: Execute one verified run; log metrics in `CANONICAL_RUN.md`.
+7. Astra does final screenshot/demo polish based on Canonical Run.
+8. Gemini reconciles README, SUBMISSION.md, and DEMO.md.
+9. Security scan (no leaked credentials).
+10. Public GitHub push.
+11. Record video (Human).
+12. Verify every link.
+13. SUBMIT.
+
+After canonical run, NO architecture rewrite.
+After video recording, fix ONLY submission-breaking issues.

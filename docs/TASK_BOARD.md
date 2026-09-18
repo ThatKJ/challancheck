@@ -8,8 +8,8 @@
 | P0-02 | Bedrock multimodal spike | BUILD | TODO | |
 | P0-03 | Observation schema validation | BUILD | TODO | |
 | P0-04 | Core deterministic rule engine | BUILD | TODO | |
-| P0-05 | Adversarial rule audit | REDTEAM | TODO | |
-| P0-06 | Secret/security scan | REDTEAM | TODO | |
+| P0-05 | Adversarial rule audit | REDTEAM | IN_PROGRESS | Engine absent; 14 traps pre-registered in tests/adversarial/rule_expectations.json; see QA RED-005 |
+| P0-06 | Secret/security scan | REDTEAM | IN_PROGRESS | Scan clean on tracked files+history (script verified); GAP: no root .gitignore — see QA RED-004 |
 | P0-07 | Core E2E workflow | BUILD | TODO | |
 
 ## P1
@@ -23,7 +23,7 @@
 | P1-05 | Failure states | BUILD | TODO | |
 | P1-06 | Deployment | BUILD | TODO | |
 | P1-07 | Demo narrative | LEAD | TODO | |
-| P1-08 | Claim audit | REDTEAM | TODO | |
+| P1-08 | Claim audit | REDTEAM | IN_PROGRESS | 3 claim defects filed (QA RED-003); scanner at scripts/verification/claims_audit.sh |
 
 ## P2
 
