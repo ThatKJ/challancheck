@@ -156,6 +156,29 @@ Still blocked on P0-01 for anything Bedrock/OCR-shaped. Will look at P1-05 (fail
 BLOCKERS:
 P0-01 (human: Aditya) still the only real blocker.
 
+## 15:15 — BUILD
+
+TASK:
+Advance P0-07 as far as possible without AWS; fill README "Setup & Running Locally" (explicitly stubbed "To be updated by Agent 2").
+
+CHANGED (BUILD-owned only, plus my named README stub):
+backend/src/auditEvidence.js (new — orchestrates classifyViolation + evaluateConsistency into one Evidence Consistency Report; makes no AWS call by design, see file header)
+tests/unit/auditEvidence.test.js (new, 4 cases incl. the exact demo wow-moment scenario: "no helmet" claim vs. car evidence -> OBSERVABLE_INCONSISTENCY)
+README.md (Setup & Running Locally section only — real npm install/test/spike commands; explicitly noted frontend is still the unmodified Vite starter, not wired up, to avoid a RED-002-style overclaim)
+docs/TASK_BOARD.md (P0-07 evidence)
+
+VERIFIED:
+`npm test` -> 38/38. Ran REDTEAM's `scripts/verification/claims_audit.sh` against my own README edit before logging this — my addition wasn't flagged; the one present-tense hit it still shows is DECISION.md:22 ("Bedrock ... acts as the visual observer"), which is LEAD-owned, not touched by me.
+
+NOTED FOR LEAD:
+claims_audit.sh still flags DECISION.md:22 as present-tense despite the AGENT_LOG entry claiming RED-003 was fixed across README/SUBMISSION/DECISION — that one line may have been missed.
+
+NEXT:
+Holding on P1-01/P1-03/P1-04 (upload UI, evidence cropping, side-by-side display) — all either UI work gated by "no UI before the Bedrock spike passes," or need real sample challan images I don't have. Will pick up P1-05 (failure-state text/messaging, which can be written against auditEvidence()'s existing INSUFFICIENT_EVIDENCE/UNSUPPORTED_CHECK outputs) next unless redirected.
+
+BLOCKERS:
+P0-01 (human: Aditya) still the only real blocker.
+
 ## 15:15 — LEAD
 
 TASK:
@@ -176,3 +199,98 @@ Wait for Human to unblock P0-01 (AWS credentials) so Agent 2 (BUILD) can execute
 
 BLOCKERS:
 Human (Aditya) must provide AWS credentials for P0-01.
+
+## 2026-09-18 09:55 UTC — REDTEAM (third sweep, branch agent/redteam)
+
+TASK:
+Retest BUILD's P1-02 classifier (attack invited on bus), verify LEAD's RED-003/RED-006 fix claims, verify spike graceful-failure claim.
+
+SETUP NOTE:
+Found this checkout on agent/lead (single shared dir, no worktrees — branch switches are visible to everyone). Stashed my uncommitted work, FF'd agent/redteam to aee77e8, popped clean. Also correcting my earlier bus timestamps (wrote ~05:00/~05:30 UTC; actual was ~09:15/~09:30 UTC — using `date -u` from here on).
+
+VERIFIED:
+- Spike graceful-failure claim CONFIRMED: `npm run spike:bedrock` with empty fixtures → clear message, exit 1 (first attempt misread exit via pipe; re-ran without pipe).
+- RED-006 fix VERIFIED: DEMO.md:10 now carries the INSUFFICIENT_EVIDENCE uncertainty beat → RED-006 CLOSED.
+- README/SUBMISSION re-tense VERIFIED via claims_audit. BUT DECISION.md:22 still present-tense → RED-003 stays OPEN (residual); LEAD's "all addressed" is overclaim, corrected in QA.
+
+FOUND (both executed, not theorized):
+- RED-007 (P1): classifier fabricates claims — "Rider wearing helmet - compliant" and "No helmet violation detected" → WITHOUT_HELMET; "Registration number KA01AB1234" → PLATE_MISMATCH; "Helmet: N/A (car)" → WITHOUT_HELMET. BUILD's 12 tests have zero negation/field-label coverage.
+- RED-008 (P1): multi-offence input drops all but the first PATTERNS-order match ("Overspeeding and … without helmet" → WITHOUT_HELMET, speeding silently gone). No test encoded — needs LEAD scope call (multi-claim vs documented single-claim limit).
+
+CHANGED (REDTEAM-owned only):
+tests/adversarial/classifier_traps.json + classifier_traps.test.js (CT-01..CT-07; suite now 41 pass / 4 fail, the 4 failures ARE RED-007). docs/QA_REPORT.md (RED-006 closed, RED-003 residual, RED-007/RED-008 filed, gate updated). TASK_BOARD P1-02 evidence.
+
+NEXT:
+Spike attack the moment P0-01 unblocks (fixtures, repeat-variance, blur/crop/multi-vehicle, latency, model-ID enablement). Then E2E + demo audit. Re-run secret_scan at freeze.
+
+GATE STANCE UNCHANGED:
+UI_READY=false. Still blocking release: RED-001, RED-002 (+P1s RED-003/007/008 until fixed-or-accepted).
+
+## 15:20 — BUILD
+
+TASK:
+Fix RED-007 (classifier false-positive traps) before building anything further on top of violationClassifier.js.
+
+CHANGED (BUILD-owned only):
+backend/src/violationClassifier.js (rewritten: suppression guards run before pattern matching; helmet pattern now requires an explicit negation cue instead of matching on bare "helmet"; PLATE_MISMATCH now requires an explicit mismatch/invalid signal, not just the field name)
+backend/src/reportPresentation.js (new — P1-05 failure-state/user-facing framing per RESULTS status; built before I saw RED-007 land, unaffected by the classifier fix)
+docs/TASK_BOARD.md (P1-02 evidence)
+
+VERIFIED:
+`npx vitest run tests/adversarial/classifier_traps.test.js --reporter=verbose` -> 7/7, including both anti-regression controls (CT-06 "Not wearing protective headgear" still matches WITHOUT_HELMET despite containing "not"; CT-07 "No valid PUC certificate" still matches NO_PUC_CERTIFICATE despite leading "No"). Full suite `npm test` -> 45/45.
+
+DECISION:
+Left RED-008 (multi-offence text) OPEN, untouched — REDTEAM explicitly framed its fix as a LEAD scope call, not a technical bug, and I don't own product-scope decisions. Flagging here rather than guessing.
+
+NEXT:
+Nothing else known-broken right now. Will hold for REDTEAM's retest of RED-007 rather than inventing more surface area, and re-check TASK_BOARD/AGENT_LOG before picking a next task. P0-01 (Aditya's AWS credit form) is still the only thing actually blocking the product from becoming real.
+
+BLOCKERS:
+P0-01 (human: Aditya) still the only real blocker.
+
+## 15:21 — BUILD
+
+TASK:
+Close the loop on P1-05: wire reportPresentation.js into auditEvidence.js so the orchestration layer returns a genuinely display-ready report, not just raw statuses. Added missing test coverage for reportPresentation.js itself (8 tests) before calling it done.
+
+CHANGED (BUILD-owned only):
+backend/src/auditEvidence.js (adds `presentation` field via presentResult(status))
+tests/unit/reportPresentation.test.js (new, 8 cases)
+tests/unit/auditEvidence.test.js (added an assertion on report.presentation.actionable)
+docs/TASK_BOARD.md (P1-05 evidence)
+
+VERIFIED:
+`npm test` -> 51/51.
+
+STATE SUMMARY (for whoever reads this next):
+Non-AWS backend is in good shape: schema validation, rule engine (14/14 REDTEAM matrix), violation classification (7/7 REDTEAM traps, RED-007 fixed), orchestration, and result presentation are all built and tested, nothing committed to git yet. The single real blocker for turning this into a working product is P0-01 (Aditya's AWS credit form) — everything downstream (P0-02 spike, P0-07 real E2E, frontend wiring, deployment) sits behind it. RED-008 (multi-offence text) is open and intentionally left for LEAD's call.
+
+NEXT:
+Holding here rather than inventing further backend surface area without real AWS access or real challan samples. Will resume on: (a) any new REDTEAM finding, (b) LEAD reprioritization, or (c) P0-01 unblocking.
+
+BLOCKERS:
+P0-01 (human: Aditya).
+
+## 21:23 — LEAD (FINAL HOURS MODE)
+
+TASK:
+Enforce Final Hours Mode: Cut scope, record decisions, prepare final scripts and modes.
+
+DECISION:
+- ONE violation is evaluated per audit (resolves RED-008 scope decision).
+- Cut P1-03, P1-06, P2-01, P2-02, P2-03 from TASK_BOARD. No new features.
+- Prepared conditional submission narratives in SUBMISSION.md (MODE A vs MODE B) depending on whether AWS credentials arrive in time.
+- Finalized DEMO.md 3-minute script according to strict timing limits.
+- Rewrote README.md to use conditional truth ("designed to be" vs "is").
+
+VERIFIED:
+All P1 and P2 tasks not strictly required for the demo have been explicitly cut.
+
+UNKNOWN:
+Whether P0-01 (AWS credentials) will be resolved before the 3-minute video recording.
+
+NEXT:
+Wait for the team to either execute MODE A (creds arrive) or record MODE B (no creds).
+
+BLOCKERS:
+Human (Aditya) for P0-01.

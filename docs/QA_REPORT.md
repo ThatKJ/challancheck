@@ -1,6 +1,6 @@
 # QA Report — Red Team (Agent 3)
 
-Verdict: **NOT A RELEASE CANDIDATE** — 2 open P0s, 3 open P1s. Core flow does not exist yet; all findings verified against live repo state, not prose.
+Verdict: **NOT A RELEASE CANDIDATE** — 2 open P0s, 3 open P1s (8 findings: RED-001..RED-008).
 
 Audit commit: `e94b94d` + uncommitted docs restructure (Agent 1, in progress at audit time).
 Audit date: 2026-09-18. Scope: `main` branch, 23 tracked files.
@@ -35,7 +35,7 @@ Actual: (a) README "What We Built" describes a system that is not built. (b) "fr
 Reproduction: grep `accurate|detects|proves|invalid|wrong|legal|fraud|guaranteed|real-time|automatic|reliable|incorrect` → hits are problem-framing + unbuilt capability claims.
 Evidence: README:10-14, DECISION.md:7, DEMO.md:6-10, CANONICAL_RUN.md stub.
 Recommended smallest fix: tense-guard ("will"/"planned") until P0-02/P0-04 land; quantify-or-drop "frequently"; define confidence semantics in the observation-schema task (P0-03) before DEMO promises numbers.
-Status: OPEN
+Status: OPEN (residual 2026-09-18) — LEAD re-tensed README/SUBMISSION and dropped "frequently" (verified via claims_audit), but DECISION.md:22 is still present-tense ("acts as the visual observer. It extracts structured facts"). One-line fix outstanding; LEAD's "all addressed" bus claim is therefore overclaim — corrected here.
 
 ## ID: RED-004
 Severity: P1
@@ -65,13 +65,38 @@ Actual: Timing sums correctly to 3:00 and the 2:20–2:40 AWS beat does separate
 Reproduction: read `docs/DEMO.md`.
 Evidence: DEMO.md:1-12.
 Recommended smallest fix (LEAD-owned): swap ~10s of the 1:50–2:20 payoff for a blurry-photo → INSUFFICIENT_EVIDENCE beat. No action while P0/P1 open.
-Status: OPEN (deferred, P2)
+Status: CLOSED 2026-09-18 — uncertainty beat verified in DEMO.md:10 (2:10–2:25 INSUFFICIENT_EVIDENCE on blurry photo).
 
 ---
 
+## ID: RED-007
+Severity: P1
+Claim/Component: `classifyViolation()` (P1-02) — "maps common real-world e-Challan phrasing… and never drops unrecognized text"
+Expected: Text that does not cite an offence falls through to slug (matched:false). A fabricated claim corrupts the entire downstream report.
+Actual: 4 proven false-claim traps (executed, not theorized):
+- "Rider wearing helmet - compliant" → WITHOUT_HELMET, matched:true (compliance inverted)
+- "No helmet violation detected" → WITHOUT_HELMET, matched:true (explicit negation inverted)
+- "Registration number KA01AB1234" → PLATE_MISMATCH, matched:true (field label mistaken for offence)
+- "Helmet: N/A (car)" → WITHOUT_HELMET, matched:true (N/A marker mistaken for offence)
+Harm direction: "No helmet violation detected" + helmetless-rider photo → CONSISTENT_WITH_EVIDENCE supporting a charge that was never made. BUILD's 12 unit tests cover only positive mappings — zero negation/field-label coverage.
+Reproduction: node probe of `classifyViolation` (see AGENT_LOG); failing acceptance tests CT-01..CT-04 in `tests/adversarial/classifier_traps.test.js` (suite now 41 pass / 4 fail — the 4 failures ARE this finding).
+Evidence: `tests/adversarial/classifier_traps.json` + `.test.js` (REDTEAM-owned); CT-05..CT-07 anti-regression controls pass.
+Recommended smallest fix: negation/compliance guard before pattern matching (e.g. comply/ok/present/worn/N-A/no-violation contexts suppress the match) WITHOUT breaking CT-06 ("Not wearing protective headgear" must stay WITHOUT_HELMET — naive negation guards will fail this control). Then make the 4 red tests green; do not edit the trap files.
+Status: OPEN
+
+## ID: RED-008
+Severity: P1
+Claim/Component: `classifyViolation()` multi-offence handling (P1-02)
+Expected: All cited offences checked, or an explicit single-claim limitation.
+Actual: "Overspeeding and driving without helmet" → WITHOUT_HELMET, speeding silently dropped. Selection follows PATTERNS array order (helmet first), not challan order, with no signal a second offence was ignored. Multi-offence challans are common; the report will silently audit a fraction of the challan.
+Reproduction: node probe above.
+Evidence: same harness; deliberately NOT encoded as a failing test — the correct single output is a scope decision, not a technical fact.
+Recommended smallest fix (LEAD decides): either support multi-claim evaluation, or document the single-claim limitation in DECISION.md and surface "1 of N offences checked" in the report. Smallest honest step is the latter.
+Status: OPEN
+
 ## Release gate
 
-RELEASE CANDIDATE — **FAIL**. Blocking: RED-001, RED-002. Also required before pass: real AWS path verified (P0-01/P0-02), canonical run populated, root .gitignore landed, RED-003 claims re-tensed, RED-005 matrix green against real engine, demo path runs end-to-end.
+RELEASE CANDIDATE — **FAIL**. Blocking P0: RED-001, RED-002. Blocking P1 until fixed-or-accepted: RED-003 (residual), RED-007, RED-008. Also required before pass: real AWS path verified (P0-01/P0-02), canonical run populated, root .gitignore landed, RED-003 claims re-tensed, RED-005 matrix green against real engine, demo path runs end-to-end.
 
 ## Handoff pointer
 

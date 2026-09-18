@@ -32,5 +32,8 @@ Generates a grievance packet with a button to "Open official grievance portal".
 - DO NOT make legal guilt/innocence decisions.
 - DO NOT try to connect directly to the government database (uploading screenshots is safer).
 
+## Scope Limitations
+- ONE violation is evaluated per audit. If a challan cites multiple offences, the system will only audit the primary targeted claim (Addresses RED-008).
+
 ## Safety / Truth Rule
 The AI only observes visual facts. The application code (deterministic rules) decides if those facts conflict with the violation claim. If the image is too blurry, the system explicitly outputs "INSUFFICIENT EVIDENCE".
