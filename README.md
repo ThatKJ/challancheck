@@ -27,7 +27,7 @@ Once an AWS account/credentials exist, drop 5 traffic-evidence images into `scri
 AWS_REGION=<region> BEDROCK_MODEL_ID=<model-id> npm run spike:bedrock
 ```
 
-**Frontend (currently the unmodified Vite starter template — not yet wired to the backend):**
+**Frontend (3-screen React app for upload, claim selection, and evidence audit):**
 ```
 cd frontend
 npm install

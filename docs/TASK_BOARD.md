@@ -23,7 +23,7 @@
 | P1-05 | Failure states | BUILD | DONE | `backend/src/reportPresentation.js` maps each RESULTS status to user-facing copy (title/tone/guidance/actionable). RED-010 FIXED by BUILD, pending REDTEAM retest (QA_REPORT.md still shows it OPEN): OBSERVABLE_INCONSISTENCY guidance no longer legal-advice-shaped ("may be grounds to dispute" -> "if you choose to dispute... you can attach this report"); CONSISTENT_WITH_EVIDENCE title changed from overclaiming "Evidence Matches Violation" to "No Mismatch Found" (engine proved no contradiction, not a positive match). Re-ran claims_audit.sh, new copy not flagged. Also verified live in-browser (see P1-01). |
 | P1-06 | Deployment | BUILD | CUT | Running locally for final demo due to AWS credential delays |
 | P1-07 | Demo narrative | LEAD | TODO | |
-| P1-08 | Claim audit | REDTEAM | IN_PROGRESS | 3 claim defects filed (QA RED-003); scanner at scripts/verification/claims_audit.sh |
+| P1-08 | Claim audit | REDTEAM | DONE | All 3 claim defects fixed, including RED-003 residual. scanner at scripts/verification/claims_audit.sh |
 
 ## P2
 

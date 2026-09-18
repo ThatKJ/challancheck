@@ -4,7 +4,7 @@
 - **0:20–0:35**: Show incorrect-looking claim/evidence example.
 - **0:35–0:50**: Upload screenshot/PDF to ChallanCheck.
 - **0:50–1:00**: Selected claim is extracted.
-- **1:00–1:20**: Bedrock observations are generated.
+- **1:00–1:20**: Observations are generated (via Bedrock or local adapter depending on AWS verification status).
 - **1:20–1:40**: Deterministic mismatch is flagged.
 - **1:40–1:55**: Evidence explanation.
 - **1:55–2:15**: Uncertainty Beat: Upload blurry evidence -> INSUFFICIENT EVIDENCE (refuses to guess).

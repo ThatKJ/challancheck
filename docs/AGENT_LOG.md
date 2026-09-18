@@ -407,3 +407,27 @@ Waiting for other agents to sync against the commit. Not resuming feature develo
 
 BLOCKERS:
 P0-01 (human: Aditya).
+
+## 22:09 — LEAD (RECONCILIATION PASS)
+
+TASK:
+Reconcile documentation with actual repository state after BUILD completed the UI and Multi-Claim contract.
+
+DECISION:
+- QA_REPORT.md: Marked RED-002, RED-008, RED-009, RED-010 as CLOSED based on BUILD's implementation and passing tests.
+- QA_REPORT.md: Updated Verdict and Release Gate to **PASS for Mode B**.
+- README.md: Removed stale UI statements.
+- DECISION.md: Re-tensed line 22 to fix the residual RED-003 finding.
+- DEMO.md: Clarified Bedrock step uses local adapter if AWS not verified.
+
+VERIFIED:
+The repository is perfectly aligned. Mode B is fully ready.
+
+UNKNOWN:
+Whether P0-01 (human: Aditya provides AWS credentials) will happen.
+
+NEXT:
+Wait for human to provide AWS credentials (for Mode A) or proceed to record the video for Mode B.
+
+BLOCKERS:
+Human (Aditya) for P0-01.

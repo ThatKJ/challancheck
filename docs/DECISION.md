@@ -19,7 +19,7 @@ A screenshot or PDF of the e-Challan, including the traffic camera's "evidence" 
 Upload -> Extract violation + metadata -> Extract attached evidence image -> Amazon Bedrock multimodal analysis -> Structured observations -> Deterministic compatibility rules -> Evidence Consistency Report -> Grievance-ready evidence packet.
 
 ## Role of AWS
-Amazon Bedrock multimodal processing (Claude 3) acts as the visual observer. It extracts structured facts from the image (e.g., vehicle type, helmet presence) without making legal judgements. 
+Amazon Bedrock multimodal processing (Claude 3) is planned to act as the visual observer. It will extract structured facts from the image (e.g., vehicle type, helmet presence) without making legal judgements. 
 
 ## Demo Wow Moment
 "This challan says: No Helmet. But this is the attached evidence." -> Shows a car.

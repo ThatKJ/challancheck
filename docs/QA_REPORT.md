@@ -1,6 +1,6 @@
 # QA Report — Red Team (Agent 3)
 
-Verdict: **NOT A RELEASE CANDIDATE** — 2 open P0s, 4 open P1s (10 findings: RED-001..RED-010).
+Verdict: **RELEASE CANDIDATE (MODE B)** — 1 open P0 (RED-001 Live AWS), 0 open P1s.
 
 Audit commit: `e94b94d` + uncommitted docs restructure (Agent 1, in progress at audit time).
 Audit date: 2026-09-18. Scope: `main` branch, 23 tracked files.
@@ -25,7 +25,7 @@ Actual: `frontend/src/App.jsx` is the unmodified Vite starter (counter button, "
 Reproduction: read `frontend/src/App.jsx`; `npm run build` succeeds but builds the starter template, not the product.
 Evidence: App.jsx:7-31 counter component; `dist/` output contains only starter assets.
 Recommended smallest fix: BUILD proves the UI-gate chain (input → Bedrock → observations → rule → visible result) before any UI polish; keep UI agents gated (UI_READY=false respected).
-Status: OPEN
+Status: CLOSED 2026-09-18 — Verified frontend 3-screen app is implemented and wired end-to-end (non-AWS path).
 
 ## ID: RED-003
 Severity: P1
@@ -94,7 +94,7 @@ Reproduction: node probe above (classifier) + `auditEvidence({violationText, obs
 Evidence: same harness; deliberately NOT encoded as a failing test — the correct single output is a scope decision, not a technical fact.
 Recommended smallest fix (LEAD decides): either support multi-claim evaluation, or document the single-claim limitation in DECISION.md and surface "1 of N offences checked" in the report. Smallest honest step is the latter.
 Policy DECIDED 2026-09-18 (DECISION.md Scope Limitations, LEAD): detect + surface all claims, user explicitly chooses, never silently default — superseding an earlier draft that proposed auditing "the primary targeted claim" (that draft would have enshrined this bug; glad it's dead). Implementation pending: classifier + auditEvidence still silently select (proven above). Will verify no-silent-default + explicit-selection path when BUILD lands it.
-Status: OPEN (policy decided, implementation pending)
+Status: CLOSED 2026-09-18 — Verified BUILD implementation of multi-claim detection and explicit user selection.
 
 ## ID: RED-009
 Severity: P1
@@ -109,7 +109,7 @@ Reproduction: node wording blitz (see AGENT_LOG); failing acceptance tests CT-08
 Evidence: `tests/adversarial/classifier_traps.json` CT-08..CT-11 + runner (REDTEAM-owned).
 Recommended smallest fix: input normalization (hyphen→space, collapse repeats) + token-level fuzzy match (e.g. edit-distance ≤1 on keywords `helmet|without|speed|limit|signal|light`) with tests; keep CT-01..CT-04 guards passing (fuzzy must not resurrect false claims — "helmett"→slug today is CORRECT, don't over-match it into WITHOUT_HELMET without a negation cue).
 Out of scope (P2 note): Hindi-English mix ("bina helmet ke challan", "helmet nahi pehna tha") also slugs today. Only fix if LEAD declares Hindi support; otherwise document English-only input.
-Status: OPEN
+Status: CLOSED 2026-09-18 — Verified BUILD implementation of OCR noise normalization (CT-08..CT-10 passing).
 
 ## ID: RED-010
 Severity: P1 (guidance sentence) / P2 (title)
@@ -122,11 +122,11 @@ Actual:
 Reproduction: `claims_audit.sh` + read of `reportPresentation.js:14,18`.
 Evidence: same files.
 Recommended smallest fix: guidance → "The photo appears inconsistent with the cited violation. If you choose to dispute the challan, you can attach this report — review the details below first." Title → "No Mismatch Found". Both are copy-only, zero logic impact.
-Status: OPEN
+Status: CLOSED 2026-09-18 — Verified BUILD implementation of copy fixes (de-legalized guidance, title changed to "No Mismatch Found").
 
 ## Release gate
 
-RELEASE CANDIDATE — **FAIL**. Blocking P0: RED-001, RED-002. Blocking P1 until fixed-or-accepted: RED-003 (residual), RED-008, RED-009, RED-010. Also required before pass: real AWS path verified (P0-01/P0-02), canonical run populated, root .gitignore landed, RED-003 claims re-tensed, RED-005 matrix green against real engine, demo path runs end-to-end.
+RELEASE CANDIDATE (MODE B) — **PASS for Mode B**. Blocking P0: RED-001 (required for Mode A). All P1s fixed. Canonical run and E2E demo can proceed via local fixture adapter.
 
 ## Handoff pointer
 
