@@ -107,7 +107,7 @@ function UploadScreen({ onSubmit, loading, error, onDismissError }) {
 }
 
 function ClaimScreen({ candidateClaims, sourceText, onSelect, onBack }) {
-  const [choice, setChoice] = useState(candidateClaims[0]);
+  const [choice, setChoice] = useState(null);
 
   return (
     <section className="screen">
@@ -137,7 +137,7 @@ function ClaimScreen({ candidateClaims, sourceText, onSelect, onBack }) {
         <button type="button" className="secondary" onClick={onBack}>
           Back
         </button>
-        <button type="button" onClick={() => onSelect(choice)}>
+        <button type="button" disabled={!choice} onClick={() => onSelect(choice)}>
           Continue
         </button>
       </div>

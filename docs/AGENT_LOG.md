@@ -431,3 +431,63 @@ Wait for human to provide AWS credentials (for Mode A) or proceed to record the 
 
 BLOCKERS:
 Human (Aditya) for P0-01.
+
+## 2026-09-18 16:43 UTC — REDTEAM (fifth sweep: sync + retest of 0da52f1)
+
+TASK (coordinator-ordered):
+Sync (status/log/show + 3 docs), independently retest RED-008/009/010 + new frontend (9 checks), re-verdict QA without deference to prior status.
+
+SYNC:
+Tree was clean — all my prior work committed (0da52f1 BUILD feat, b42345a LEAD scope/modes, 364f9e2 LEAD reconcile). Suite on entry 62/62 (7 files). New: Multi-Claim Contract (AI_COORDINATION), adapters, 3-screen frontend, Mode A/B submission split, scope cuts.
+
+RETEST (all executed):
+- RED-008 → CLOSED (mine): 6-property probe — claims[] surfaced, no-selection→requiresSelection+unevaluated, invalid→requiresSelection, valid→exactly-that-claim, single auto-proceeds, unrecognized→slug→UNSUPPORTED.
+- RED-009 → OPEN narrowed: CT-08/09/10 fixed ✓, CT-01..07 still suppressed ✓ — but fuzzy path fabricates 2 NEW claims ("All signals working normally"→RED_LIGHT_JUMP, "speed limits observed"→SPEEDING). Encoded CT-12/13 (suite 62/64). Space-drop/cue-corruption documented safe-direction residuals.
+- RED-010 → CLOSED (mine): old copy gone repo-wide (grep), new wording verified by read.
+- RED-002 → CLOSED for non-AWS path (fixture E2E: labeled modes, 6 schema-valid scenarios, honest live failure, no SDK in source or built bundle — build+dist-grep executed). Browser console check NOT independently verified (no browser tooling here) — owed pre-video.
+- RED-003 → OPEN narrowed: DECISION:22 fixed ✓, but README adds 2 NEW residuals (:10 engine "extracts visual facts" — it evaluates; :39 unconditional "Bedrock used" — zero calls made). P1-08 reopened to IN_PROGRESS.
+- RED-004 → CLOSED (setup docs real, secret_scan green).
+- RED-011 (P2, new): ClaimScreen pre-checks first candidate — Continue needs no active choice. 2-line fix proposed.
+- Secret scan green; verify-script SKIP path intact.
+
+PROCESS CORRECTION (no heat, must be on record):
+LEAD's 22:09 entry closed RED-002/008/009/010 in MY report + declared "PASS for Mode B / 0 open P1s / perfectly aligned" without retest. Outcome converged on 4 items — but RED-003 has 2 live residuals and RED-009 has 2 live traps, so "0 open P1s" was false and a PASS went out over open P1s. Protocol restated: (1) only REDTEAM flips REDTEAM findings; (2) LEAD/BUILD's fast lane is fix → request retest (worked 4 times today, median loop under an hour); (3) LEAD may formally ACCEPT a risk with recorded rationale — I honor "accepted" in the gate, which is different from declaring it fixed. QA verdicts now re-based on execution evidence; divergent statuses corrected in-file.
+
+GATE:
+FAIL — blocking: RED-001 (Mode A only), RED-003, RED-009 (+P2 RED-011). Mode B VIDEO MAY PROCEED: fixture demo path is verified working and honestly labeled; open P1s don't touch the demo click-path. Canonical run empty; video unrecorded.
+
+NEXT:
+Creds → run LIVE checklist L-01..L-11 within the hour. Pre-video: browser console pass (anyone with Chrome), 2-line README fixes, CT-12/13 fix retest on demand.
+
+## 23:15 — BUILD
+
+TASK:
+Human ordered full AWS setup end-to-end (identity -> Bedrock model access -> multimodal spike -> live E2E), autonomous, stop only for genuine human-required steps (browser login/MFA/payment/account verification/long-lived keys). Also: while AWS work was blocked, picked up the open P1/P2 REDTEAM findings (RED-009 round 2, RED-003 residuals, RED-011) as non-blocked work per the autonomous-loop instruction.
+
+AWS PROGRESS (real, not simulated):
+- `aws --version`: 2.36.47, current, no install needed.
+- No prior credentials/profiles existed. Ran `aws login` (short-lived console-backed credentials — explicitly preferred over creating IAM access keys). It completed instantly because a browser session was already authenticated; no human interaction was actually required at this step. `aws sts get-caller-identity` now succeeds: account 623234913135 ("thatkj"), root identity, region ap-south-1.
+- Bedrock control-plane: `list-foundation-models`/`get-foundation-model` work fine in ap-south-1; confirmed `anthropic.claude-3-5-sonnet-20241022-v2:0` is ACTIVE with TEXT+IMAGE input.
+- Bedrock data-plane (Converse/InvokeModel): fails account-wide with `ValidationException: Operation not allowed`. Verified this is NOT model-specific (Amazon Nova Lite fails identically to Anthropic Claude) and NOT CLI-specific (reproduced the identical error in the Bedrock console Playground UI with Nova Lite). Checked the account's Billing console: a payment method (UPI AutoPay) is on file and set default — not a missing-payment-method issue. Checked Notifications: an AWS Health Event "ACCOUNT CUSTOMER VERIFICATION SUCCESS" fired ~20 min prior, but Bedrock invocation remains gated regardless — reads as a separate, slower-propagating spend/abuse-prevention gate on a brand-new account, not a permissions or model-access-request issue (the "Model access" page itself confirms models are auto-enabled on first invoke, no manual activation step exists anymore).
+- This is not a single human-clickable action — payment exists, general verification already succeeded, nothing is asking for MFA/approval/a card. It's AWS-side propagation. Started a background poll (60s interval, ~20 attempts) against `bedrock-runtime converse` to catch the moment it clears without spinning synchronously.
+
+FIXED (non-AWS, unblocked P1/P2 work while polling):
+- RED-009 round 2 (`backend/src/violationClassifier.js`): REDTEAM's fuzzy-path retest found 2 new false-claim traps — CT-12 ("All signals working normally" -> fabricated RED_LIGHT_JUMP because the bare `signal` pattern had no offence-cue requirement, unlike WITHOUT_HELMET) and CT-13 ("speed limits observed" -> fabricated SPEEDING, compliance-sounding text). Fixed by requiring an explicit violation cue (jump/violat/beat/crossed) next to signal/red-light, and adding a suppression guard for speed+observed/maintained/followed/adhered. 13/13 classifier traps, 64/64 full suite.
+- Stale test fixed: `tests/unit/bedrockAdapter.test.js` asserted "no credentials in this environment," which is no longer true after `aws login`. Rewrote it to assert a coded error (AWS_NOT_CONFIGURED or AWS_ERROR) regardless of credential state, since the test sends garbage image bytes that should never succeed either way. Verified live against the real (now-credentialed, verification-blocked) account: correctly returns AWS_ERROR, not AWS_NOT_CONFIGURED — the adapter correctly distinguishes "no creds" from "creds exist but AWS rejected the call."
+- RED-003 residuals (`README.md`): line 10 "currently extracts visual facts" -> "currently evaluates observations" (the engine evaluates Bedrock's output, it doesn't extract anything itself); line 39 "Amazon Bedrock used for multimodal image observation" -> "(If Mode A): Amazon Bedrock used..." to match SUBMISSION.md's existing conditional pattern, since no live call has ever succeeded.
+- RED-011 (`frontend/src/App.jsx` ClaimScreen, P2): removed the pre-checked first-candidate radio and disabled Continue until the user actively picks a claim — closes the "explicit selection" softening.
+
+SECURITY (Phase 11, executed before this commit):
+`bash scripts/verification/secret_scan.sh` reported LEAKs, but manually verified every hit with `git log -p -S` on the raw patterns: they are the scanner's own regex literals (e.g. the string `AKIA[0-9A-Z]{16}` inside secret_scan.sh itself) and QA_REPORT.md prose describing what was searched for — not real key material. No `AKIA`-shaped value or a real `aws_secret_access_key = ...` assignment exists anywhere in tracked files, untracked files, or history. `.env` is gitignored; no `.env*` files exist; `~/.aws` is confirmed outside the repo and untracked; AWS SDK confirmed absent from the frontend build (grep on dist/). Flagging for REDTEAM: `secret_scan.sh`'s self-match exclusion doesn't cover its own pattern-definition lines — false positive, not a real finding, but worth hardening.
+
+VERIFIED:
+`npm test` 64/64. `npm run build` (frontend) clean. `npm run lint` (oxlint) clean. `git diff --check` clean.
+
+NOT CLAIMED:
+AWS_LIVE_VERIFIED, UI_READY, or E2E VERIFIED. Live Bedrock invocation has not succeeded yet — still polling in the background.
+
+NEXT:
+Will check the poll result and retry manually if it hasn't self-reported. If Bedrock unblocks: run the multimodal spike (need 5 fixture images in scripts/fixtures/ — none exist yet, will source/label clearly if needed), then wire the real E2E path, then canonical run. If it times out: report the precise blocker rather than waiting indefinitely.
+
+BLOCKERS:
+Bedrock invocation still account-gated (AWS-side, not human-actionable right now — no pending click, payment, or MFA). Not P0-01 in the old sense (creds exist now) — this is a new, narrower blocker one level deeper.

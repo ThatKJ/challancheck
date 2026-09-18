@@ -1,31 +1,30 @@
 # QA Report — Red Team (Agent 3)
 
-Verdict: **RELEASE CANDIDATE (MODE B)** — 1 open P0 (RED-001 Live AWS), 0 open P1s.
+Verdict: **NOT A RELEASE CANDIDATE** — 1 open P0 (RED-001 live AWS), 2 open P1s (RED-003 copy residuals, RED-009 fuzzy false-positives), 1 open P2 (RED-011 preselect). Retested 2026-09-18 against committed revision 0da52f1/364f9e2 — every closure below rests on fresh execution evidence, regardless of prior status.
 
-Audit commit: `e94b94d` + uncommitted docs restructure (Agent 1, in progress at audit time).
-Audit date: 2026-09-18. Scope: `main` branch, 23 tracked files.
+Audit revisions: first sweep `e94b94d` (23 files, docs+scaffold); retest sweep `0da52f1` (backend, adapters, 3-screen frontend, 62-test suite).
 
 ---
 
 ## ID: RED-001
 Severity: P0
-Claim/Component: "Amazon Bedrock performs multimodal visual observation" (README:13, SUBMISSION.md:6, DECISION.md:22) / AWS integration
-Expected: Real Bedrock call path (SDK import, model call, region config) somewhere in the repo.
-Actual: Zero Bedrock code. `backend/`, `infra/`, `scripts/`, `tests/` do not exist. Every "bedrock" match in the repo is docs prose (12 matches, all `.md`). The present-tense README claims describe an unbuilt system.
-Reproduction: `ls backend infra scripts tests` → all "No such file or directory"; grep `bedrock|boto3|@aws-sdk|invoke_model` → docs-only hits.
-Evidence: `git ls-files` = 23 files (docs + Vite scaffold only). Root blocker is P0-01 (AWS creds BLOCKED on human/leader-only credit form).
-Recommended smallest fix: BUILD lands P0-02 spike; LEAD re-tenses README/SUBMISSION claims to future/aspirational until CANONICAL_RUN.md is populated.
-Status: OPEN
+Claim/Component: Live AWS/Bedrock observation path (P0-01/P0-02)
+Expected: A real, successful Bedrock multimodal call in-region.
+Actual (updated 2026-09-18): the call path now EXISTS — `backend/src/bedrockAdapter.js` (env region/model, AWS_NOT_CONFIGURED mapping, no hardcoded creds) + `scripts/bedrock-spike.js` — but has never succeeded: no credentials in any environment, `scripts/fixtures/` empty, live status UNKNOWN. The original "zero Bedrock code" body is superseded; the missing piece is purely credentials + a first green run.
+Reproduction: `sh scripts/verification/bedrock_live_verify.sh` → SKIP (no creds), zero cost.
+Evidence: adapter skim (env-only config); committed board P0-01/P0-02 BLOCKED.
+Recommended smallest fix: human provides creds → run LIVE checklist L-01..L-11 (`scripts/verification/bedrock_live_checklist.md`).
+Status: OPEN (sole P0; blocks Mode A only — Mode B demo path does not need it)
 
 ## ID: RED-002
 Severity: P0
-Claim/Component: Core E2E workflow (P0-07) / DEMO.md flow
+Claim/Component: Core E2E workflow (P0-07) / demo flow
 Expected: Upload → observe → rule → visible result.
-Actual: `frontend/src/App.jsx` is the unmodified Vite starter (counter button, "Get started" HMR text). No upload, no report, no rule output. DEMO.md scripts a flow that cannot run. (Not a false-DONE — board honestly shows TODO — but it is a demo blocker and becomes submission-invalid if unchanged by Sept 20.)
-Reproduction: read `frontend/src/App.jsx`; `npm run build` succeeds but builds the starter template, not the product.
-Evidence: App.jsx:7-31 counter component; `dist/` output contains only starter assets.
-Recommended smallest fix: BUILD proves the UI-gate chain (input → Bedrock → observations → rule → visible result) before any UI polish; keep UI agents gated (UI_READY=false respected).
-Status: CLOSED 2026-09-18 — Verified frontend 3-screen app is implemented and wired end-to-end (non-AWS path).
+Actual (updated 2026-09-18): 3-screen React app replaces the starter. Fixture path: explicit fixture/live radio, `source = fixture` tags + "never live Bedrock output" hint, 6 scenarios covering all 4 result states + multi-claim, all schema-valid (probed). Live path: fails honestly (AWS_NOT_CONFIGURED banner + "Live AWS/Bedrock status: UNKNOWN", no fixture fallback in code). No AWS SDK in frontend source or built bundle (build + dist grep, executed). Error state preserves upload inputs; loading resets. NOT independently browser-run by REDTEAM (no browser tooling here) — BUILD's in-browser claim stands unverified by me; static + build evidence is strong but a console-error check pre-video is still owed (by anyone with a browser).
+Reproduction: read `frontend/src/App.jsx`, `lib/audit.js`, `backend/src/fixtureAdapter.js`; `npm run build` + dist grep; fixture schema-validation probe.
+Evidence: same files; ErrorBanner:18-26; source-tag:184-187; live-adapter honest-failure:22-53 of lib/audit.js.
+Recommended smallest fix: pre-video browser pass (console errors, 4 states, multi-claim click path) by BUILD/LEAD/human; then close the browser-verification gap note.
+Status: CLOSED for the non-AWS path (fixture E2E verified statically + build). Live-AWS leg remains inside RED-001.
 
 ## ID: RED-003
 Severity: P1
@@ -35,7 +34,10 @@ Actual: (a) README "What We Built" describes a system that is not built. (b) "fr
 Reproduction: grep `accurate|detects|proves|invalid|wrong|legal|fraud|guaranteed|real-time|automatic|reliable|incorrect` → hits are problem-framing + unbuilt capability claims.
 Evidence: README:10-14, DECISION.md:7, DEMO.md:6-10, CANONICAL_RUN.md stub.
 Recommended smallest fix: tense-guard ("will"/"planned") until P0-02/P0-04 land; quantify-or-drop "frequently"; define confidence semantics in the observation-schema task (P0-03) before DEMO promises numbers.
-Status: OPEN (residual 2026-09-18) — LEAD re-tensed README/SUBMISSION and dropped "frequently" (verified via claims_audit), but DECISION.md:22 is still present-tense ("acts as the visual observer. It extracts structured facts"). One-line fix outstanding; LEAD's "all addressed" bus claim is therefore overclaim — corrected here.
+Status: OPEN (narrowed 2026-09-18) — DECISION:22 fixed ✓ (verified future-tense). Two NEW residuals in README, both verified by read:
+(a) README:10 "The deterministic engine currently extracts visual facts" — inaccurate: the engine evaluates observations, it never extracts; nothing extracts yet. Fix: "currently evaluates observations and identifies mismatches".
+(b) README:39 "Amazon Bedrock used for multimodal image observation" — present-tense, unconditional, FALSE (zero Bedrock calls have ever been made). Fix: "(If Mode A)" like SUBMISSION:19.
+Mode B submission copy (SUBMISSION:14-15 "(via mocked integration)", honest incomplete-pipeline note; DEMO:7 adapter-conditional; DEMO:12 limitations beat) verified clean — good disclosure, do not touch.
 
 ## ID: RED-004
 Severity: P1
@@ -44,8 +46,8 @@ Expected: Clone → install → run, with secrets impossible to commit by defaul
 Actual: Setup audit is MIXED. PASS: no secrets in tracked files or history (`AKIA`/`aws_secret`/`.env` searches empty), `node_modules` untracked, frontend `npm run build` succeeds (vite 8.3.0, 222ms). FAIL/GAP: (a) README setup section is a stub ("To be updated by Agent 2") — no reproducible product setup exists. (b) No root `.gitignore` — only `frontend/.gitignore` — so a future `backend/.env` or credential file at root has no ignore protection. Given P0-01 will soon inject real AWS secrets into env, this gap is time-sensitive.
 Reproduction: `git log --all -S 'AKIA' -- .` (empty); `ls -a` (no root .gitignore); README:16-18 stub; `npm run build` in `frontend/` (pass).
 Evidence: 23 tracked files, none matching `\.env|credential|secret|pem|key`.
-Recommended smallest fix: ~~LEAD/BUILD add root `.gitignore`~~ DONE in working tree (covers `node_modules/`, `.env*`, `*.pem`, `*credentials*`; secret_scan.sh exits 0). Remaining: BUILD documents setup when P0-02 lands.
-Status: PARTLY CLOSED (hygiene clean; setup docs still open)
+Recommended smallest fix: ~~LEAD/BUILD add root `.gitignore`~~ DONE and committed (covers `node_modules/`, `.env*`, `*.pem`, `*credentials*`; secret_scan.sh exits 0). README "Setup & Running Locally" now documents real backend/frontend/spike commands (verified by read) — setup-docs gap closed.
+Status: CLOSED 2026-09-18 (re-verified on new revision: secret_scan.sh exit 0 across tracked+untracked+history+gitignore; standing order to re-run at freeze remains)
 
 ## ID: RED-005
 Severity: P1
@@ -93,8 +95,8 @@ Pipeline-level proof 2026-09-18 (`auditEvidence`, car photo): "No helmet and no 
 Reproduction: node probe above (classifier) + `auditEvidence({violationText, observation})` probe (pipeline).
 Evidence: same harness; deliberately NOT encoded as a failing test — the correct single output is a scope decision, not a technical fact.
 Recommended smallest fix (LEAD decides): either support multi-claim evaluation, or document the single-claim limitation in DECISION.md and surface "1 of N offences checked" in the report. Smallest honest step is the latter.
-Policy DECIDED 2026-09-18 (DECISION.md Scope Limitations, LEAD): detect + surface all claims, user explicitly chooses, never silently default — superseding an earlier draft that proposed auditing "the primary targeted claim" (that draft would have enshrined this bug; glad it's dead). Implementation pending: classifier + auditEvidence still silently select (proven above). Will verify no-silent-default + explicit-selection path when BUILD lands it.
-Status: CLOSED 2026-09-18 — Verified BUILD implementation of multi-claim detection and explicit user selection.
+Policy DECIDED 2026-09-18 (DECISION.md Scope Limitations, LEAD): detect + surface all claims, user explicitly chooses, never silently default — superseding an earlier draft that proposed auditing "the primary targeted claim" (that draft would have enshrined this bug; glad it's dead). Retest 2026-09-18 vs 0da52f1 (all executed): `claims[]` = ["WITHOUT_HELMET","SPEEDING"] surfaced ✓; no selection → `{requiresSelection:true, evaluated:false}` ✓; invalid selection → requiresSelection ✓; valid SPEEDING selection → exactly that claim evaluated ✓; single claim auto-proceeds ✓; unrecognized → slug → UNSUPPORTED ✓. Contract holds at backend. One UI softening (P2, see RED-011): ClaimScreen pre-checks the first candidate.
+Status: CLOSED (contract implemented + enforced; RED-011 tracks the UI nit)
 
 ## ID: RED-009
 Severity: P1
@@ -109,7 +111,8 @@ Reproduction: node wording blitz (see AGENT_LOG); failing acceptance tests CT-08
 Evidence: `tests/adversarial/classifier_traps.json` CT-08..CT-11 + runner (REDTEAM-owned).
 Recommended smallest fix: input normalization (hyphen→space, collapse repeats) + token-level fuzzy match (e.g. edit-distance ≤1 on keywords `helmet|without|speed|limit|signal|light`) with tests; keep CT-01..CT-04 guards passing (fuzzy must not resurrect false claims — "helmett"→slug today is CORRECT, don't over-match it into WITHOUT_HELMET without a negation cue).
 Out of scope (P2 note): Hindi-English mix ("bina helmet ke challan", "helmet nahi pehna tha") also slugs today. Only fix if LEAD declares Hindi support; otherwise document English-only input.
-Status: CLOSED 2026-09-18 — Verified BUILD implementation of OCR noise normalization (CT-08..CT-10 passing).
+Retest 2026-09-18 vs 0da52f1: CT-08/09/10 now match ✓, CT-01..07 still suppressed ✓ (fuzzy did not resurrect the false claims — the key safety property holds). BUT the fuzzy path introduced two NEW false-claim variants (executed): "All signals working normally" → RED_LIGHT_JUMP (plural→keyword correction fabricates a claim from descriptive text) and "speed limits observed" → SPEEDING (compliance-sounding, no offence cue — same class as CT-02). Encoded as failing CT-12/CT-13 (suite 62/64). Known safe-direction residuals (not encoded): space-drop ("nohelmet") and cue-corruption ("missng helmet") still slug — diminishing returns, revisit only if OCR source shows these shapes.
+Status: OPEN (narrowed: original OCR gap fixed; fuzzy over-correction gap new)
 
 ## ID: RED-010
 Severity: P1 (guidance sentence) / P2 (title)
@@ -122,11 +125,22 @@ Actual:
 Reproduction: `claims_audit.sh` + read of `reportPresentation.js:14,18`.
 Evidence: same files.
 Recommended smallest fix: guidance → "The photo appears inconsistent with the cited violation. If you choose to dispute the challan, you can attach this report — review the details below first." Title → "No Mismatch Found". Both are copy-only, zero logic impact.
-Status: CLOSED 2026-09-18 — Verified BUILD implementation of copy fixes (de-legalized guidance, title changed to "No Mismatch Found").
+Retest 2026-09-18 vs 0da52f1: BUILD applied essentially this wording (verified by read of reportPresentation.js:14,18); old strings gone repo-wide (grep, executed); INSUFFICIENT/UNSUPPORTED copy still correct; no accurate/guarantee/AI-detected/confirmed/verified in product paths.
+Status: CLOSED (copy fix verified)
+
+## ID: RED-011
+Severity: P2
+Claim/Component: Claim-selection screen (`frontend/src/App.jsx` ClaimScreen)
+Expected: Per the Multi-Claim Contract ("require explicit user selection"), Continue must require an active choice.
+Actual: `useState(candidateClaims[0])` pre-checks the first candidate with Continue always enabled — a click-through user proceeds on the default without ever choosing. Backend still enforces selection-required (requiresSelection gate), and all candidates are displayed, so no silent audit occurs; this is a UX softening of "explicit", not a contract breach.
+Reproduction: read App.jsx:109-110,140-142.
+Evidence: same file.
+Recommended smallest fix: `choice` starts null, Continue disabled until a radio is picked. Two-line change, zero logic impact.
+Status: OPEN (P2 — fix if time, does not block demo)
 
 ## Release gate
 
-RELEASE CANDIDATE (MODE B) — **PASS for Mode B**. Blocking P0: RED-001 (required for Mode A). All P1s fixed. Canonical run and E2E demo can proceed via local fixture adapter.
+RELEASE CANDIDATE — **FAIL**. Blocking P0: RED-001 (live AWS; blocks Mode A only). Blocking P1 until fixed-or-formally-accepted: RED-003 (README:10/:39 residuals), RED-009 (CT-12/13 fuzzy false-positives). Mode B demo path (fixture E2E) is verified working and honestly labeled — the video can proceed on Mode B while these close. Canonical run still empty; video unrecorded; pre-video browser console check still owed.
 
 ## Handoff pointer
 

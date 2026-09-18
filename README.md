@@ -7,7 +7,7 @@ ChallanCheck audits whether the photographic evidence attached to an e-challan i
 Automated traffic cameras can issue incorrect e-Challans (e.g. fining a car driver for "no helmet"). Disputing them requires manually analyzing evidence and navigating a bureaucratic grievance portal.
 
 ## What We Are Building
-ChallanCheck is designed to be an Evidence Consistency Engine. The user uploads a screenshot of the e-Challan and its evidence photo. The deterministic engine currently extracts visual facts and identifies mismatches (like "Car vs Helmet violation"), preparing a structured grievance packet.
+ChallanCheck is designed to be an Evidence Consistency Engine. The user uploads a screenshot of the e-Challan and its evidence photo. The deterministic engine currently evaluates observations and identifies mismatches (like "Car vs Helmet violation"), preparing a structured grievance packet.
 
 ## AWS Integration
 - **Amazon Bedrock**: The Bedrock integration will perform multimodal visual observation on the traffic camera evidence to extract structured facts (vehicle type, helmet presence) WITHOUT making legal judgements.
@@ -36,4 +36,4 @@ npm run dev
 
 ## AI Tools Used
 - Antigravity AI agents used for product ideation, task management, code generation, and verification.
-- Amazon Bedrock used for multimodal image observation.
+- (If Mode A): Amazon Bedrock used for multimodal image observation.

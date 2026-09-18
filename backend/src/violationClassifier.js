@@ -52,6 +52,7 @@ const SUPPRESSION_GUARDS = [
   /\bno\b[\s\S]*\b(violation|offence|offense)\b[\s\S]*\b(detected|found|observed|noted)\b/i, // e.g. "No helmet violation detected"
   /\bn\/a\b/i, // e.g. "Helmet: N/A (car)"
   /\bregistration\s*(number|no\.?)\b/i, // e.g. "Registration number KA01AB1234" (field echo, not an offence)
+  /\bspeed\b[\s\S]{0,25}\b(observed|maintained|followed|adhered|within\s*limit)\b/i, // e.g. "speed limits observed" (RED-009 CT-13)
 ];
 
 const PATTERNS = [
@@ -69,7 +70,12 @@ const PATTERNS = [
   },
   {
     claim: "RED_LIGHT_JUMP",
-    test: (t) => /signal|red\s*light/i.test(t),
+    // Requires an explicit violation cue next to signal/red-light — bare
+    // mentions of "signal" (e.g. "all signals working normally") must not
+    // match (RED-009 CT-12).
+    test: (t) =>
+      /\b(jump(?:ed|ing)?|violat(?:ion|ed)|beat|crossed)\b[\s\S]{0,25}\b(signal|red\s*light)\b/i.test(t) ||
+      /\b(signal|red\s*light)\b[\s\S]{0,25}\b(jump(?:ed|ing)?|violat(?:ion|ed)|beat|crossed)\b/i.test(t),
   },
   {
     claim: "PLATE_MISMATCH",

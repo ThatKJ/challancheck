@@ -66,6 +66,18 @@
       "trap": "control: spaced compound already matches",
       "text": "OVER SPEEDING",
       "expected": { "claim": "SPEEDING", "matched": true }
+    },
+    {
+      "id": "CT-12",
+      "trap": "REGRESSION via fuzzy path: plural created a keyword ('signals'->'signal') and fabricated a signal-jumping claim from descriptive text",
+      "text": "All signals working normally",
+      "expected": { "claim": "ALL_SIGNALS_WORKING_NORMALLY", "matched": false }
+    },
+    {
+      "id": "CT-13",
+      "trap": "compliance-sounding text must not become SPEEDING (same class as CT-02: keyword present, no offence cue)",
+      "text": "speed limits observed",
+      "expected": { "claim": "SPEED_LIMITS_OBSERVED", "matched": false }
     }
   ]
 }
