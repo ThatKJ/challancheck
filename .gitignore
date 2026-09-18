@@ -1,0 +1,19 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Secrets — must never be committed. Real AWS credentials arrive soon (P0-01).
+.env
+.env.*
+!.env.example
+*.pem
+*credentials*
+aws-credentials*
+
+# Editor/OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.log

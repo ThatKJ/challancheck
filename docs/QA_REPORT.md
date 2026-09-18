@@ -1,6 +1,6 @@
 # QA Report — Red Team (Agent 3)
 
-Verdict: **NOT A RELEASE CANDIDATE** — 2 open P0s, 3 open P1s (8 findings: RED-001..RED-008).
+Verdict: **NOT A RELEASE CANDIDATE** — 2 open P0s, 4 open P1s (10 findings: RED-001..RED-010).
 
 Audit commit: `e94b94d` + uncommitted docs restructure (Agent 1, in progress at audit time).
 Audit date: 2026-09-18. Scope: `main` branch, 23 tracked files.
@@ -82,21 +82,51 @@ Harm direction: "No helmet violation detected" + helmetless-rider photo → CONS
 Reproduction: node probe of `classifyViolation` (see AGENT_LOG); failing acceptance tests CT-01..CT-04 in `tests/adversarial/classifier_traps.test.js` (suite now 41 pass / 4 fail — the 4 failures ARE this finding).
 Evidence: `tests/adversarial/classifier_traps.json` + `.test.js` (REDTEAM-owned); CT-05..CT-07 anti-regression controls pass.
 Recommended smallest fix: negation/compliance guard before pattern matching (e.g. comply/ok/present/worn/N-A/no-violation contexts suppress the match) WITHOUT breaking CT-06 ("Not wearing protective headgear" must stay WITHOUT_HELMET — naive negation guards will fail this control). Then make the 4 red tests green; do not edit the trap files.
-Status: OPEN
+Status: CLOSED 2026-09-18 — BUILD implemented suppression guards + tightened helmet/plate patterns (bus/AGENT_LOG:235). Independently verified: all 4 former traps now fall through to slug (node probe), CT-01..CT-07 7/7 green, trap files byte-intact (BUILD never touched REDTEAM-owned files). Full suite 52/55 with only the new CT-08..CT-10 red (see RED-009).
 
 ## ID: RED-008
 Severity: P1
 Claim/Component: `classifyViolation()` multi-offence handling (P1-02)
 Expected: All cited offences checked, or an explicit single-claim limitation.
 Actual: "Overspeeding and driving without helmet" → WITHOUT_HELMET, speeding silently dropped. Selection follows PATTERNS array order (helmet first), not challan order, with no signal a second offence was ignored. Multi-offence challans are common; the report will silently audit a fraction of the challan.
-Reproduction: node probe above.
+Pipeline-level proof 2026-09-18 (`auditEvidence`, car photo): "No helmet and no seatbelt" → `{canonicalClaim: WITHOUT_HELMET, status: OBSERVABLE_INCONSISTENCY}` with report keys `violation,observation,result,presentation,generatedAt` — no multi-claim signal anywhere in the report object. Silent selection survives end-to-end, not just in the classifier unit.
+Reproduction: node probe above (classifier) + `auditEvidence({violationText, observation})` probe (pipeline).
 Evidence: same harness; deliberately NOT encoded as a failing test — the correct single output is a scope decision, not a technical fact.
 Recommended smallest fix (LEAD decides): either support multi-claim evaluation, or document the single-claim limitation in DECISION.md and surface "1 of N offences checked" in the report. Smallest honest step is the latter.
+Policy DECIDED 2026-09-18 (DECISION.md Scope Limitations, LEAD): detect + surface all claims, user explicitly chooses, never silently default — superseding an earlier draft that proposed auditing "the primary targeted claim" (that draft would have enshrined this bug; glad it's dead). Implementation pending: classifier + auditEvidence still silently select (proven above). Will verify no-silent-default + explicit-selection path when BUILD lands it.
+Status: OPEN (policy decided, implementation pending)
+
+## ID: RED-009
+Severity: P1
+Claim/Component: `classifyViolation()` on real OCR text (P1-02's stated input path is "e.g. OCR output")
+Expected: Common OCR corruptions of real offence labels still classify; only truly unrecognized text degrades to UNSUPPORTED_CHECK.
+Actual: Safe direction (no fabricated claims) but brittle coverage — proven by execution:
+- "wthout helmet" (vowel-drop) → slug → UNSUPPORTED_CHECK instead of audit
+- "speed limt" (truncation) → slug instead of SPEEDING
+- "jumping red-light" (hyphen) → slug instead of RED_LIGHT_JUMP (`\s*` doesn't span hyphens)
+Case/punctuation/whitespace/numbers all handled correctly ("nO hElMeT", "Driving without helmet!!!", "   " → UNKNOWN_VIOLATION). So the gap is specifically OCR-noise + hyphen-compounds — exactly what a screenshot→OCR pipeline produces daily.
+Reproduction: node wording blitz (see AGENT_LOG); failing acceptance tests CT-08..CT-10 (suite 52/55, CT-11 control passes).
+Evidence: `tests/adversarial/classifier_traps.json` CT-08..CT-11 + runner (REDTEAM-owned).
+Recommended smallest fix: input normalization (hyphen→space, collapse repeats) + token-level fuzzy match (e.g. edit-distance ≤1 on keywords `helmet|without|speed|limit|signal|light`) with tests; keep CT-01..CT-04 guards passing (fuzzy must not resurrect false claims — "helmett"→slug today is CORRECT, don't over-match it into WITHOUT_HELMET without a negation cue).
+Out of scope (P2 note): Hindi-English mix ("bina helmet ke challan", "helmet nahi pehna tha") also slugs today. Only fix if LEAD declares Hindi support; otherwise document English-only input.
+Status: OPEN
+
+## ID: RED-010
+Severity: P1 (guidance sentence) / P2 (title)
+Claim/Component: User-facing copy in `backend/src/reportPresentation.js`
+Expected: No legal-advice-shaped wording anywhere (contract: system determines neither legal validity nor legal advice); verdict titles must not overclaim beyond "no mismatch found".
+Actual:
+- (P1) OBSERVABLE_INCONSISTENCY guidance: "This may be grounds to dispute the challan" — recommends a legal course of action. Hedged with "may"/"review before deciding", but "grounds to dispute" is a legal conclusion about the user's options. A judge or grievance officer reading this sees the app giving legal advice.
+- (P2) CONSISTENT_WITH_EVIDENCE title: "Evidence Matches Violation" — overconfident. The engine proved no contradiction, not a match (photo could still be the wrong vehicle entirely). "No Mismatch Found" states exactly what was established.
+- Copy audit otherwise clean: no accurate/guarantee/AI-detected/confirmed/verified anywhere in product paths; INSUFFICIENT ("We won't guess") and UNSUPPORTED ("cannot be confirmed or refuted") worded correctly; DECISION/SUBMISSION re-tense verified.
+Reproduction: `claims_audit.sh` + read of `reportPresentation.js:14,18`.
+Evidence: same files.
+Recommended smallest fix: guidance → "The photo appears inconsistent with the cited violation. If you choose to dispute the challan, you can attach this report — review the details below first." Title → "No Mismatch Found". Both are copy-only, zero logic impact.
 Status: OPEN
 
 ## Release gate
 
-RELEASE CANDIDATE — **FAIL**. Blocking P0: RED-001, RED-002. Blocking P1 until fixed-or-accepted: RED-003 (residual), RED-007, RED-008. Also required before pass: real AWS path verified (P0-01/P0-02), canonical run populated, root .gitignore landed, RED-003 claims re-tensed, RED-005 matrix green against real engine, demo path runs end-to-end.
+RELEASE CANDIDATE — **FAIL**. Blocking P0: RED-001, RED-002. Blocking P1 until fixed-or-accepted: RED-003 (residual), RED-008, RED-009, RED-010. Also required before pass: real AWS path verified (P0-01/P0-02), canonical run populated, root .gitignore landed, RED-003 claims re-tensed, RED-005 matrix green against real engine, demo path runs end-to-end.
 
 ## Handoff pointer
 

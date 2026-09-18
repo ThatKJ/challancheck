@@ -1,0 +1,103 @@
+{
+  "$comment": "REDTEAM-owned adversarial matrix for the deterministic consistency engine (P0-04/P0-05). ENGINE DOES NOT EXIST YET — these are pre-registered expectations BUILD must satisfy. Runner contract: load this JSON in Node, pass each case {claim, observation} to the rule module, assert got === expected. Statuses: OBSERVABLE_INCONSISTENCY | CONSISTENT_WITH_EVIDENCE | INSUFFICIENT_EVIDENCE | UNSUPPORTED_CHECK. Observation shape follows docs/AI_COORDINATION.md schema.",
+  "cases": [
+    {
+      "id": "ADV-01",
+      "trap": "helmet claim against car must be inconsistency, never consistent",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "car", "confidence": 0.95 }, "people_visible": { "value": 1, "confidence": 0.9 }, "helmet": { "status": "not_applicable", "confidence": 0.95 }, "license_plate": { "visible": true, "text": "KA01AB1234", "confidence": 0.8 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "OBSERVABLE_INCONSISTENCY"
+    },
+    {
+      "id": "ADV-02",
+      "trap": "uncertain helmet on motorcycle must degrade, not guess",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "motorcycle", "confidence": 0.9 }, "people_visible": { "value": 1, "confidence": 0.7 }, "helmet": { "status": "uncertain", "confidence": 0.4 }, "license_plate": { "visible": false, "text": null, "confidence": 0.2 }, "image_quality": "moderate", "occlusion": "partial", "uncertainties": ["rider partially hidden"] },
+      "expected": "INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "id": "ADV-03",
+      "trap": "clear no-helmet motorcycle is the positive control",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "motorcycle", "confidence": 0.95 }, "people_visible": { "value": 1, "confidence": 0.95 }, "helmet": { "status": "not_visible", "confidence": 0.9 }, "license_plate": { "visible": true, "text": "KA05MN4567", "confidence": 0.85 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "CONSISTENT_WITH_EVIDENCE"
+    },
+    {
+      "id": "ADV-04",
+      "trap": "speed cannot be determined from a single photo",
+      "claim": "SPEEDING",
+      "observation": { "vehicle_type": { "value": "car", "confidence": 0.95 }, "people_visible": { "value": 1, "confidence": 0.9 }, "helmet": { "status": "not_applicable", "confidence": 0.9 }, "license_plate": { "visible": true, "text": "KA03XY7890", "confidence": 0.9 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "UNSUPPORTED_CHECK"
+    },
+    {
+      "id": "ADV-05",
+      "trap": "signal state cannot be determined from a single photo",
+      "claim": "RED_LIGHT_JUMP",
+      "observation": { "vehicle_type": { "value": "car", "confidence": 0.9 }, "people_visible": { "value": 1, "confidence": 0.8 }, "helmet": { "status": "not_applicable", "confidence": 0.9 }, "license_plate": { "visible": true, "text": "KA04PQ1111", "confidence": 0.8 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "UNSUPPORTED_CHECK"
+    },
+    {
+      "id": "ADV-06",
+      "trap": "registry truth is outside photographic evidence",
+      "claim": "PLATE_MISMATCH",
+      "observation": { "vehicle_type": { "value": "car", "confidence": 0.9 }, "people_visible": { "value": 0, "confidence": 0.6 }, "helmet": { "status": "not_applicable", "confidence": 0.9 }, "license_plate": { "visible": true, "text": "KA02ZZ9999", "confidence": 0.9 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "UNSUPPORTED_CHECK"
+    },
+    {
+      "id": "ADV-07",
+      "trap": "severe occlusion must not yield a confident verdict",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "motorcycle", "confidence": 0.55 }, "people_visible": { "value": 1, "confidence": 0.5 }, "helmet": { "status": "uncertain", "confidence": 0.3 }, "license_plate": { "visible": false, "text": null, "confidence": 0.1 }, "image_quality": "poor", "occlusion": "severe", "uncertainties": ["vehicle mostly cropped", "heavy compression"] },
+      "expected": "INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "id": "ADV-08",
+      "trap": "unknown vehicle type blocks helmet reasoning",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "unknown", "confidence": 0.3 }, "people_visible": { "value": 1, "confidence": 0.5 }, "helmet": { "status": "uncertain", "confidence": 0.4 }, "license_plate": { "visible": false, "text": null, "confidence": 0.2 }, "image_quality": "poor", "occlusion": "partial", "uncertainties": ["vehicle class unclear"] },
+      "expected": "INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "id": "ADV-09",
+      "trap": "car + motorcycle in one frame: ambiguity must not resolve to consistent",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "car", "confidence": 0.6 }, "people_visible": { "value": 2, "confidence": 0.6 }, "helmet": { "status": "uncertain", "confidence": 0.4 }, "license_plate": { "visible": true, "text": "KA01CC2222", "confidence": 0.7 }, "image_quality": "moderate", "occlusion": "partial", "uncertainties": ["multiple vehicles in frame"] },
+      "expected": "INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "id": "ADV-10",
+      "trap": "helmet visible on scooter contradicts the claim -> inconsistency (claim not supported by photo)",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "scooter", "confidence": 0.92 }, "people_visible": { "value": 1, "confidence": 0.9 }, "helmet": { "status": "visible", "confidence": 0.88 }, "license_plate": { "visible": true, "text": "KA06HH3333", "confidence": 0.8 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "OBSERVABLE_INCONSISTENCY"
+    },
+    {
+      "id": "ADV-11",
+      "trap": "auto-rickshaw is not a helmet-applicable vehicle",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "auto_rickshaw", "confidence": 0.9 }, "people_visible": { "value": 2, "confidence": 0.85 }, "helmet": { "status": "not_applicable", "confidence": 0.9 }, "license_plate": { "visible": true, "text": "KA07RR4444", "confidence": 0.75 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "OBSERVABLE_INCONSISTENCY"
+    },
+    {
+      "id": "ADV-12",
+      "trap": "truck driver helmet claim is category nonsense",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "truck", "confidence": 0.93 }, "people_visible": { "value": 1, "confidence": 0.8 }, "helmet": { "status": "not_applicable", "confidence": 0.9 }, "license_plate": { "visible": true, "text": "KA08TT5555", "confidence": 0.8 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "OBSERVABLE_INCONSISTENCY"
+    },
+    {
+      "id": "ADV-13",
+      "trap": "irrelevant evidence photo (no vehicle at all)",
+      "claim": "WITHOUT_HELMET",
+      "observation": { "vehicle_type": { "value": "unknown", "confidence": 0.1 }, "people_visible": { "value": 0, "confidence": 0.2 }, "helmet": { "status": "uncertain", "confidence": 0.1 }, "license_plate": { "visible": false, "text": null, "confidence": 0.0 }, "image_quality": "poor", "occlusion": "severe", "uncertainties": ["no vehicle visible"] },
+      "expected": "INSUFFICIENT_EVIDENCE"
+    },
+    {
+      "id": "ADV-14",
+      "trap": "unknown claim type must be unsupported, never forced into a verdict",
+      "claim": "NO_PUC_CERTIFICATE",
+      "observation": { "vehicle_type": { "value": "car", "confidence": 0.95 }, "people_visible": { "value": 1, "confidence": 0.9 }, "helmet": { "status": "not_applicable", "confidence": 0.9 }, "license_plate": { "visible": true, "text": "KA09PP6666", "confidence": 0.9 }, "image_quality": "good", "occlusion": "none", "uncertainties": [] },
+      "expected": "UNSUPPORTED_CHECK"
+    }
+  ]
+}

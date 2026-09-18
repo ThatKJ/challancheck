@@ -157,6 +157,30 @@ innocence
 legality
 whether a challan should be cancelled
 
+## Multi-Claim Contract
+
+Decided 2026-09-18 (human product decision; reconciles RED-008 with the
+"one violation per audit" rule in docs/DECISION.md Scope Limitations).
+
+- ChallanCheck may detect multiple candidate violations from one challan.
+- It must NEVER silently choose one.
+- If exactly one supported claim is found, it may proceed with that claim.
+- If multiple supported claims are found, surface all candidates and require
+  explicit user selection.
+- Exactly ONE selected violation is evaluated per individual audit.
+- The user can subsequently audit another detected claim separately.
+
+Implementation: `backend/src/violationClassifier.js` returns every recognized
+claim in `claims[]`, never just the first. `backend/src/auditEvidence.js`
+evaluates immediately when `claims.length <= 1`; when `claims.length > 1` and
+no valid `selectedClaim` is given, it returns `{requiresSelection: true,
+candidateClaims}` instead of evaluating anything. The frontend's Screen 2
+(claim selection) only appears in that ambiguous case. Auditing a second
+detected claim today means re-submitting the same violation text/evidence
+from Screen 1 and picking the other candidate on Screen 2 — this satisfies
+the contract but isn't a one-click "audit the other claim" shortcut; that
+UX polish is unbuilt (out of scope during this freeze).
+
 ## Priority
 
 P0:

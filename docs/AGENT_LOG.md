@@ -226,6 +226,30 @@ Spike attack the moment P0-01 unblocks (fixtures, repeat-variance, blur/crop/mul
 GATE STANCE UNCHANGED:
 UI_READY=false. Still blocking release: RED-001, RED-002 (+P1s RED-003/007/008 until fixed-or-accepted).
 
+## 2026-09-18 ~10:00 UTC — REDTEAM (fourth sweep, coordinator-tasked blitz)
+
+TASK (explicit priority attacks):
+(1) RED-008 multi-claim safety, (2) adversarial wording vs 51 passing tests, (3) UI fixture-vs-live check, (4) full copy audit, (5) failure states, (6) secret scan, (7) LIVE Bedrock checklist.
+
+STATE ON ENTRY:
+LEAD committed ca1ba30 (my 2nd-sweep QA/board words verbatim — no tampering). BUILD fixed RED-007 (suppression guards, 7/7 green) + added auditEvidence.js/reportPresentation.js + 2 test files. Suite 51/51 on entry.
+
+FINDINGS (all executed):
+- RED-007 → CLOSED (verified fix, trap files intact, 7/7 green).
+- RED-008 → OPEN, strengthened: pipeline-level proof via auditEvidence — "No helmet and no seatbelt" → single WITHOUT_HELMET, report keys contain zero multi-claim signal. Required: MULTIPLE_CLAIMS_DETECTED or explicit user selection (contract decision for LEAD; BUILD right to wait).
+- RED-009 (P1, new): OCR-noise brittleness — "wthout helmet", "speed limt", "jumping red-light" → slug/UNSUPPORTED. Safe direction, coverage loss on the stated OCR input path. Encoded CT-08..CT-10 (suite 52/55). Fuzzy fix must not resurrect CT-01..CT-04 ("helmett"→slug today is correct). Hindi mix noted P2/scope.
+- RED-010 (P1/P2, new): "may be grounds to dispute the challan" is legal-advice-shaped; "Evidence Matches Violation" overclaims (should be "No Mismatch Found"). Copy-only fix proposed. Rest of copy audit clean.
+- Engine boundaries (all safe, no finding): conf 0.7 inclusive/0.6999 degrades, people=-1 → validation→INSUFFICIENT, plate.text=123 passes loose schema but unused (harmless), null observation → INSUFFICIENT no-throw.
+- UI: still unmodified starter (App.jsx) — nothing to inspect; fixture-vs-live labeling requirement stands for when UI lands (any demo/fixture mode MUST be visually labeled non-live).
+- Secret scan: EXIT=0, still green (tracked+untracked+history+gitignore).
+- LIVE package ready: scripts/verification/bedrock_live_checklist.md (L-01..L-11) + bedrock_live_verify.sh (SKIP-path verified, zero cost, syntax-checked). Needs only human cost-approval + creds to run.
+
+CHANGED (REDTEAM-owned only):
+tests/adversarial/classifier_traps.json (CT-08..CT-11), scripts/verification/bedrock_live_* (new), docs/QA_REPORT.md (RED-007 closed, RED-008 strengthened, RED-009/010 filed, gate updated), TASK_BOARD P1-02 evidence.
+
+GATE STANCE UNCHANGED:
+UI_READY=false. Blocking release: RED-001, RED-002 (+P1s RED-003/008/009/010 until fixed-or-accepted). P0/P1 remaining: creds (human), E2E, OCR robustness, multi-claim policy, copy, DECISION one-liner.
+
 ## 15:20 — BUILD
 
 TASK:
@@ -294,3 +318,92 @@ Wait for the team to either execute MODE A (creds arrive) or record MODE B (no c
 
 BLOCKERS:
 Human (Aditya) for P0-01.
+
+## 21:30 — BUILD
+
+TASK:
+Human (product owner) gave a direct instruction: AWS verification is blocked but the agent is not — continue immediately, autonomously, until credentials arrive. Ordered work: (1) record the RED-008 product decision, (2) build the frontend against the frozen backend contract with dev fixtures clearly labeled, (3) implement the real Bedrock adapter behind the same interface (fails as AWS_NOT_CONFIGURED, no silent fixture fallback), (4) implement loading/error/multi-claim/side-by-side states, (5) run the full non-AWS path, (6) keep live AWS status explicitly UNKNOWN and never mark E2E VERIFIED without a real Bedrock call.
+
+CORRECTION (human decision overrides an earlier LEAD draft):
+docs/DECISION.md "Scope Limitations" previously said the system "will only audit the primary targeted claim" — this is the exact silent-default behavior RED-008 flagged as a bug, and REDTEAM had already logged the corrected policy in QA_REPORT.md (detect + surface all claims, user chooses, never silently default). The human's instruction just now matches REDTEAM's policy, not LEAD's draft. Rewrote DECISION.md to say so explicitly, noting it supersedes the earlier draft.
+
+CHANGED (BUILD-owned only):
+docs/DECISION.md (Scope Limitations corrected per above — normally LEAD-owned, edited here only because the human gave this as a direct, explicit instruction overriding the multi-agent ownership convention for this one line)
+backend/src/violationClassifier.js (RED-008: `classifyViolation()` now returns `claims: string[]` — every recognized offence, not just the first; RED-009: added `ocrNormalize()` — hyphen->space plus edit-distance-1 keyword correction on helmet/headgear/without/speed/limit/signal/light before matching, so OCR noise like "wthout helmet" or "speed limt" or "jumping red-light" still classifies instead of falling through to UNSUPPORTED_CHECK)
+backend/src/auditEvidence.js (RED-008: added `selectedClaim` param and `classifyForSelection()` export; when the text yields >1 candidate claim and no valid `selectedClaim` is given, returns `{requiresSelection: true, violation: {candidateClaims}}` instead of evaluating anything — caller must resubmit with a chosen claim)
+backend/src/reportPresentation.js (RED-010: OBSERVABLE_INCONSISTENCY guidance de-legal-ized; CONSISTENT_WITH_EVIDENCE title "Evidence Matches Violation" -> "No Mismatch Found")
+tests/unit/violationClassifier.test.js, tests/unit/auditEvidence.test.js (new cases for claims[], requiresSelection, invalid-selection-still-asks)
+docs/TASK_BOARD.md (P0-07, P1-02, P1-05 evidence)
+
+VERIFIED:
+`npm test` -> 61/61 (was 51). REDTEAM's full matrix re-run: rule_expectations.json 14/14, classifier_traps.json 11/11 (CT-01..CT-11). `bash scripts/verification/claims_audit.sh` -> new reportPresentation.js copy not flagged.
+
+NEXT:
+Building the frontend now (3 screens: upload, claim selection, evidence audit) against this contract, with a labeled dev-fixture adapter and a real Bedrock adapter that fails as AWS_NOT_CONFIGURED rather than silently substituting fixtures. Will report back per-file as it lands. Not marking anything "E2E VERIFIED" — live AWS status stays UNKNOWN until a real Bedrock call succeeds.
+
+BLOCKERS:
+None for this phase (explicitly authorized to build UI ahead of the live Bedrock call). P0-01 (Aditya) still blocks the live call itself.
+
+## 21:50 — BUILD
+
+TASK:
+Built the frontend (3 screens) and the real Bedrock adapter, per the human's continuation instruction. Ran it for real in a browser, not just `npm run build`.
+
+CHANGED (BUILD-owned only):
+backend/src/fixtureAdapter.js (new — 6 canned scenarios covering all 4 result states + the multi-claim case, every result tagged meta.source="fixture")
+backend/src/bedrockAdapter.js (new — real adapter, refactored out of scripts/bedrock-spike.js so there's one Bedrock call path, not two; throws `.code="AWS_NOT_CONFIGURED"` on credential errors, `.code="AWS_ERROR"` on anything else)
+scripts/bedrock-spike.js (rewritten as a thin CLI wrapper around bedrockAdapter.js — behavior unchanged, verified: still fails with the same clear message when fixtures/creds are missing)
+tests/unit/bedrockAdapter.test.js (new — this environment genuinely has no AWS credentials, so this test exercises the REAL failure path, not a mock: confirmed live that observeEvidenceViaBedrock() throws AWS_NOT_CONFIGURED)
+frontend/vite.config.js (widened dev-server fs.allow to the repo root so the frontend can import backend/src/* directly — one rule engine/classifier/fixture-set, not a duplicated frontend copy)
+frontend/src/lib/audit.js (new — re-exports backend logic; observeEvidenceViaLiveBackend() is the frontend's own live-mode adapter, since no backend/Lambda is deployed (P1-06 cut) it always fails honestly with AWS_NOT_CONFIGURED rather than silently using fixtures)
+frontend/src/App.jsx, frontend/src/App.css, frontend/src/index.css (full rewrite — replaced the Vite starter template entirely: Screen 1 upload/fixture picker, Screen 2 claim selection (only shown when classifyForSelection() returns >1 claim), Screen 3 side-by-side CLAIM/VISUAL OBSERVATIONS/DETERMINISTIC RESULT columns; loading state via button text, AWS error banner, dev-fixture tag always visible, "source = bedrock|fixture" shown on every result)
+
+VERIFIED (in a real Chrome browser via claude-in-chrome, not just build passing):
+- `npm run build` (frontend) succeeds; confirmed via grep that the built JS contains zero references to BedrockRuntimeClient/@aws-sdk — the AWS SDK never reaches the browser bundle, by design.
+- Clicked through all 6 fixture scenarios: OBSERVABLE_INCONSISTENCY (car+helmet demo wow moment), CONSISTENT_WITH_EVIDENCE ("No Mismatch Found" — RED-010 copy fix confirmed live), INSUFFICIENT_EVIDENCE (blurry, shows uncertainties list), UNSUPPORTED_CHECK (speeding), and the multi-claim scenario correctly routes to Screen 2 before evaluating either claim.
+- Uploaded a real file through "live" mode with typed violation text -> got the AWS Not Configured banner with "Live AWS/Bedrock status: UNKNOWN" shown explicitly, exactly as instructed — it did not fall back to fixture data.
+- FOUND AND FIXED A BUG mid-verification: the Upload screen was unmounting/remounting on every loading transition, silently wiping the user's typed text/file/mode choice whenever an error occurred — so "retry" actually meant "start over" with no indication why. Fixed by keeping Screen 1 mounted across the async call instead of swapping in a separate loading screen; re-verified the AWS-error retry path preserves state correctly.
+- Checked browser console throughout: no errors or warnings, only normal Vite/React dev messages.
+- `npm test` (backend) still 62/62 after all changes.
+
+NOT CLAIMED:
+E2E VERIFIED. Every path above is real except the one that matters most for release: an actual Bedrock call. Live AWS/Bedrock status stays UNKNOWN until P0-01 unblocks and P0-02 runs for real against the fixtures in scripts/fixtures/.
+
+NEXT:
+Nothing further to build blind. Waiting on: REDTEAM's independent verification of this batch, LEAD's reprioritization if any, or P0-01 (Aditya) unblocking the real Bedrock path.
+
+BLOCKERS:
+P0-01 (human: Aditya) — the only thing standing between this and a real, credentialed end-to-end run.
+
+## 22:05 — BUILD
+
+TASK:
+Human-ordered coordination freeze: stop implementation, verify everything, reconcile docs against actual code, commit the working state so other agents stop reasoning against stale/uncommitted state.
+
+SETUP NOTE:
+`git status` at freeze time showed HEAD on branch `agent/redteam` (not `main`) at commit b42345a, two commits ahead of `main`/`a10f3d8` (REDTEAM's own doc commits). All of BUILD's work this session was uncommitted on top of that. Committing to this same branch rather than switching, since a branch switch with this much uncommitted work is exactly the kind of git operation that risks losing it.
+
+VERIFIED (full re-run before committing):
+- `npm test` (root/backend): 62/62.
+- `npm run build` (frontend): succeeds, 24 modules, no errors.
+- `npm run lint` (frontend, oxlint): clean, no output.
+- `bash scripts/verification/secret_scan.sh`: exit 0, all 5 checks pass (tracked, untracked, history, .gitignore guard).
+- `bash scripts/verification/claims_audit.sh`: re-ran, no new present-tense/overclaim hits from BUILD's changes.
+- `npm audit` (root and frontend): 0 vulnerabilities in both.
+- `git diff --check`: clean, no whitespace errors.
+
+DOCS RECONCILED:
+- `docs/AI_COORDINATION.md`: added the canonical Multi-Claim Contract (human-specified) right after "Product Truth" — reconciles "detect all claims" with "one violation evaluated per audit": proceed automatically when exactly one claim is found, require explicit selection when more than one is found, evaluate exactly one per audit, user can audit another detected claim separately (today that means resubmitting on Screen 1, not a one-click shortcut — documented as a known gap, not hidden).
+- `docs/TASK_BOARD.md`: P1-01/P1-04 marked DONE with real-browser evidence; P1-02/P1-05 reworded to be explicit that RED-008/009/010 are BUILD-fixed but REDTEAM has not yet independently retested them — `docs/QA_REPORT.md` itself still shows all three OPEN, and this log does not claim otherwise. P0-07 stays IN_PROGRESS, explicitly not E2E VERIFIED.
+- Did not touch `docs/QA_REPORT.md` — closing REDTEAM's own findings is REDTEAM's call, not BUILD's, per their stated policy of retesting before trusting a fix.
+
+COMMIT:
+Committing this state now as instructed, using a plain commit message with no AI co-author trailer (per explicit instruction in this session, which overrides the standing AI-attribution default for this repo).
+
+AWS LIVE STATUS: UNKNOWN. Still not claiming E2E VERIFIED anywhere.
+
+NEXT:
+Waiting for other agents to sync against the commit. Not resuming feature development per instruction.
+
+BLOCKERS:
+P0-01 (human: Aditya).

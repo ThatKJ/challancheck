@@ -1,0 +1,71 @@
+{
+  "$comment": "REDTEAM-owned acceptance traps for backend/src/violationClassifier.js (P1-02). CT-01..CT-07: false-claim guards (all pass since BUILD's 2026-09-18 suppression-guard fix — see QA RED-007 CLOSED). CT-08..CT-10: OCR-noise robustness traps (currently FAIL — see QA RED-009); CT-11 is a passing control. Runner: tests/adversarial/classifier_traps.test.js (vitest).",
+  "cases": [
+    {
+      "id": "CT-01",
+      "trap": "compliance statement inverted into an offence claim",
+      "text": "Rider wearing helmet - compliant",
+      "expected": { "claim": "RIDER_WEARING_HELMET_COMPLIANT", "matched": false }
+    },
+    {
+      "id": "CT-02",
+      "trap": "explicit negation inverted into an offence claim",
+      "text": "No helmet violation detected",
+      "expected": { "claim": "NO_HELMET_VIOLATION_DETECTED", "matched": false }
+    },
+    {
+      "id": "CT-03",
+      "trap": "field label mistaken for a plate offence",
+      "text": "Registration number KA01AB1234",
+      "expected": { "claim": "REGISTRATION_NUMBER_KA01AB1234", "matched": false }
+    },
+    {
+      "id": "CT-04",
+      "trap": "N/A marker mistaken for an offence",
+      "text": "Helmet: N/A (car)",
+      "expected": { "claim": "HELMET_N_A_CAR", "matched": false }
+    },
+    {
+      "id": "CT-05",
+      "trap": "anti-regression: genuine offence must still match",
+      "text": "Riding without helmet",
+      "expected": { "claim": "WITHOUT_HELMET", "matched": true }
+    },
+    {
+      "id": "CT-06",
+      "trap": "anti-regression: 'Not wearing protective headgear' contains a negation word but IS the offence — a naive negation-guard must not break it",
+      "text": "Not wearing protective headgear",
+      "expected": { "claim": "WITHOUT_HELMET", "matched": true }
+    },
+    {
+      "id": "CT-07",
+      "trap": "anti-regression: leading 'No' must not break PUC matching",
+      "text": "No valid PUC certificate",
+      "expected": { "claim": "NO_PUC_CERTIFICATE", "matched": true }
+    },
+    {
+      "id": "CT-08",
+      "trap": "OCR vowel-drop: real challan OCR will produce this; must still match, not slug to UNSUPPORTED",
+      "text": "wthout helmet",
+      "expected": { "claim": "WITHOUT_HELMET", "matched": true }
+    },
+    {
+      "id": "CT-09",
+      "trap": "OCR truncation: must still match",
+      "text": "speed limt",
+      "expected": { "claim": "SPEEDING", "matched": true }
+    },
+    {
+      "id": "CT-10",
+      "trap": "hyphenated compound: must still match (whitespace-only patterns miss it)",
+      "text": "jumping red-light",
+      "expected": { "claim": "RED_LIGHT_JUMP", "matched": true }
+    },
+    {
+      "id": "CT-11",
+      "trap": "control: spaced compound already matches",
+      "text": "OVER SPEEDING",
+      "expected": { "claim": "SPEEDING", "matched": true }
+    }
+  ]
+}

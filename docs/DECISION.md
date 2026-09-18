@@ -33,7 +33,7 @@ Generates a grievance packet with a button to "Open official grievance portal".
 - DO NOT try to connect directly to the government database (uploading screenshots is safer).
 
 ## Scope Limitations
-- ONE violation is evaluated per audit. If a challan cites multiple offences, the system will only audit the primary targeted claim (Addresses RED-008).
+- ChallanCheck evaluates ONE violation at a time. If the challan's violation text cites multiple claims, the system detects and surfaces all of them and the user explicitly chooses which one to audit — it never silently defaults to the first/primary claim (Addresses RED-008; human product decision, 2026-09-18, supersedes an earlier draft of this section that proposed silently auditing "the primary targeted claim").
 
 ## Safety / Truth Rule
 The AI only observes visual facts. The application code (deterministic rules) decides if those facts conflict with the violation claim. If the image is too blurry, the system explicitly outputs "INSUFFICIENT EVIDENCE".
