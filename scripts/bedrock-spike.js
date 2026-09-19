@@ -1,38 +1,34 @@
 // P0-02 Bedrock multimodal spike — CLI wrapper around backend/src/bedrockAdapter.js
-// (the real adapter, also used by the frontend). This script's only job is to
-// batch-run the adapter over local fixture images and print results; the
-// actual Bedrock call logic lives in bedrockAdapter.js so the frontend and
-// this script never drift apart.
+// (the real adapter, also used by backend/server.js). This script's only job is
+// to batch-run the adapter over local fixture images and print one record per
+// image; the actual Bedrock call logic lives in bedrockAdapter.js so the server
+// and this script never drift apart.
 //
-// STATUS: NOT yet run against real AWS. Blocked on P0-01 — no AWS credentials
-// are configured in this environment (verified via `aws sts get-caller-identity`
-// -> NoCredentials). Team leader owns the $100 AWS credit signup; see
-// RULES_SNAPSHOT.md.
+// STATUS: no invocation has succeeded yet. Account 623234913135 is gated:
+// `ValidationException: Operation not allowed` for every model/region, with
+// authorizationStatus NOT_AUTHORIZED and applied Bedrock quotas of 0
+// (docs/TASK_BOARD.md P0-01). Nothing here is a verified result until it prints.
 //
-// Once credentials exist:
-//   1. Confirm the region and an available multimodal Bedrock model
-//      (do not assume a specific Claude version is enabled on the account —
-//      check with `aws bedrock list-foundation-models`).
-//   2. Set BEDROCK_MODEL_ID and AWS_REGION env vars if the defaults don't apply.
-//   3. Drop 5 diverse traffic-evidence JPEGs into scripts/fixtures/
-//      (clear motorcycle+helmet, clear motorcycle no helmet, clear car,
-//      one blurry/poor-quality image, one ambiguous/occluded image).
-//   4. Run: npm run spike:bedrock
+// Usage (once the account gate clears):
+//   1. `npm run check:bedrock-text` — one text-only call proving the SDK path.
+//   2. Put 5 traffic-evidence images in scripts/fixtures/ (see README there):
+//      clear motorcycle+helmet, clear motorcycle without helmet, clear car,
+//      blurry/degraded, ambiguous/occluded.
+//   3. `npm run spike:bedrock`  (override with AWS_REGION / BEDROCK_MODEL_ID)
+//
+// Each record is printed one field per line so scripts/verification/
+// bedrock_live_verify.sh can grep "schemaValid", "latencyMs", "vehicle_type", "helmet".
+// HALLUCINATION and VERDICT are human judgements (compare the observation to the
+// photo) and are left PENDING_HUMAN_REVIEW on purpose — the script cannot see.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { observeEvidenceViaBedrock, DEFAULT_REGION, DEFAULT_MODEL_ID } from "../backend/src/bedrockAdapter.js";
+import { sniffImageType } from "../backend/src/imageType.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
-
-function extToMediaType(file) {
-  const ext = path.extname(file).toLowerCase();
-  if (ext === ".png") return "image/png";
-  if (ext === ".webp") return "image/webp";
-  return "image/jpeg";
-}
 
 async function loadFixtures() {
   let files;
@@ -41,7 +37,12 @@ async function loadFixtures() {
   } catch {
     return [];
   }
-  return files.filter((f) => /\.(jpe?g|png|webp)$/i.test(f));
+  return files.filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort();
+}
+
+function formatRecord(record) {
+  const lines = Object.entries(record).map(([key, value]) => `  ${JSON.stringify(key)}: ${JSON.stringify(value)}`);
+  return `{\n${lines.join(",\n")}\n}`;
 }
 
 async function main() {
@@ -59,25 +60,53 @@ async function main() {
   const modelId = process.env.BEDROCK_MODEL_ID || DEFAULT_MODEL_ID;
   console.log(`Region: ${region}`);
   console.log(`Model:  ${modelId}`);
-  console.log(`Fixtures: ${fixtures.join(", ")}\n`);
+  console.log(`Fixtures (${fixtures.length}): ${fixtures.join(", ")}\n`);
 
+  let failures = 0;
   for (const file of fixtures) {
-    const filePath = path.join(FIXTURES_DIR, file);
     console.log(`--- ${file} ---`);
     try {
-      const bytes = await readFile(filePath);
-      const result = await observeEvidenceViaBedrock({
+      const bytes = await readFile(path.join(FIXTURES_DIR, file));
+      const mimeType = sniffImageType(bytes);
+      if (!mimeType) throw Object.assign(new Error("not a JPEG/PNG/WebP/GIF by magic bytes"), { code: "BAD_FIXTURE" });
+
+      const { observation, meta } = await observeEvidenceViaBedrock({
         imageBase64: bytes.toString("base64"),
-        mimeType: extToMediaType(file),
+        mimeType,
         region,
         modelId,
       });
-      console.log(JSON.stringify(result, null, 2));
+
+      // The adapter only returns after validateObservation() passes, so reaching
+      // this point means the frozen schema held; a schema failure throws instead.
+      console.log(
+        formatRecord({
+          image: file,
+          modelId: meta.modelId,
+          region: meta.region,
+          request: `${mimeType}, ${bytes.length} bytes`,
+          schemaValid: true,
+          latencyMs: meta.latencyMs,
+          vehicle_type: observation.vehicle_type,
+          people_visible: observation.people_visible,
+          helmet: observation.helmet,
+          license_plate: observation.license_plate,
+          image_quality: observation.image_quality,
+          occlusion: observation.occlusion,
+          uncertainties: observation.uncertainties,
+          hallucination: "PENDING_HUMAN_REVIEW",
+          verdict: "PENDING_HUMAN_REVIEW",
+        })
+      );
     } catch (err) {
+      failures += 1;
       console.error(`FAILED [${err.code ?? "ERROR"}]: ${err.message}`);
     }
     console.log("");
   }
+
+  console.log(`Done: ${fixtures.length - failures}/${fixtures.length} succeeded.`);
+  if (failures > 0) process.exitCode = 1;
 }
 
 main().catch((err) => {

@@ -459,6 +459,56 @@ FAIL — blocking: RED-001 (Mode A only), RED-003, RED-009 (+P2 RED-011). Mode B
 NEXT:
 Creds → run LIVE checklist L-01..L-11 within the hour. Pre-video: browser console pass (anyone with Chrome), 2-line README fixes, CT-12/13 fix retest on demand.
 
+## 2026-09-19 06:19 UTC — REDTEAM (sixth sweep: hostile UI audit of Astra's polish)
+
+TASK (coordinator-ordered hostile audit):
+Upload flow, claim selection, transitions, 4 states, AWS-down, preservation, responsiveness, console, generic-look, comprehension, motion. P0 = broken/misleading/contract-break; P1 = comprehension/polish; P2 = refinements. No praise.
+
+SYNC:
+b423079 (BUILD: RED-009 round-2 cue-requirement, README residuals, RED-011 no-preselect, all committed) + Bedrock still account-gated (ValidationException, background poll running — Mode B stands). Astra's polish uncommitted in tree (App.jsx +924, App.css +1421, ReviewPrimitives.jsx, index.html, favicon).
+
+METHOD (went beyond static read):
+Built frontend, served via vite preview, drove REAL headless Chrome over CDP with a /tmp harness (not repo): console/page-error collection, overflow metrics at 756/1440px, clicked fixture→result, fixture-multi→claim-select (verified 2 options + Continue disabled live) → second-claim result. Screenshots at 1440/1280/768/390px read with own eyes. Killed preview/chrome after.
+
+VERIFIED (executed):
+- Suite 64/64; CT-12/13 suppressed with positives intact (probed 6 signal/speed positives + all traps) → RED-009 CLOSED.
+- README residuals fixed line-by-line → RED-003 CLOSED; P1-08 → DONE.
+- RED-011 CLOSED: code (null + disabled) AND live (empty radios, disabled Continue in running UI).
+- Zero console/page errors across the entire click journey (upload, claim, both results).
+- No horizontal overflow at measured widths; 390px tabs/method-list render clean (earlier suspicion from a --screenshot still was misread — corrected, no finding).
+- Fixture/live labeling pervasive and honest (5+ distinct NON-LIVE tags); live path fails honestly; no SDK in source or bundle; inputs preserved on error; reduced-motion supported; focus management + skip-link + aria-live all present; disabled buttons visibly dimmed (opacity .45 — earlier concern dead).
+- Design is distinctive (editorial serif/mono, deep-green/ochre), not template-generic.
+
+FOUND:
+- RED-012 (P1): fixture result's largest slot is the honest-but-empty "No source photograph" placeholder — judge hears "photographic evidence", never sees a photo. Recommend labeled illustrative image OR demote placeholder. Demo-strength gap for Best-UI scoring.
+- RED-013 (P2): ~640ms staged pauses in fixture mode for synchronous work — motion language itself helps (maps pipeline), keep animations, drop delays.
+- Dead hypotheses (recorded so nobody re-litigates): mobile overflow (clean), disabled-state ambiguity (dimmed), SDK in bundle (absent), generic look (distinctive), console errors (zero).
+
+GATE:
+FAIL — sole blocker RED-001 (Mode A only). Zero other P0/P1s except RED-012. Mode B video: PROCEED. Open: RED-012 (P1), RED-013 (P2).
+
+NEXT:
+Retest RED-012/013 fixes on demand. Creds → LIVE checklist. Standing: secret_scan at freeze; canonical run content still empty.
+
+## 2026-09-19 06:48 UTC — REDTEAM (seventh sweep: FINAL UI RELEASE RETEST)
+
+TASK (narrow, per instruction — no redesign review):
+RED-012 (real image → same image in result; survival across back/forward/error/retry; labels; no fabrication), RED-013 (no artificial waits; motion polished; reduced-motion), plus regression (multi-claim, 4 states, AWS-down, mobile, console).
+
+METHOD:
+Built + served preview:4174, drove headless Chrome over CDP (/tmp harness, not repo): DOM.setFileInputFiles with a real repo PNG, paced clicks, performance.now timing with awaitPromise, emulated reduced-motion + 390px, console/page/log error collection, screenshots read. Two harness bugs caught and corrected mid-run (CDP promise handling, unrealistically fast double-click vs disabled button) — both artifacts, neither app behavior.
+
+RESULTS (all executed):
+- RED-012 → CLOSED: uploaded hero.png renders identically (blob URL, filename alt, unaltered pixels, no overlays) in preview; live submit → "Live observation is unavailable" + UNKNOWN line (both rendered, verified); claim text + file survive error AND retry; observation table matches fixture data verbatim; fixture-imageless accepted as designed (nothing exists to show; inventing imagery pre-video adds confusion surface). Limit stated in QA: result-with-uploaded-file unreachable without backend (component-equivalence verified instead); SPA has no routing (browser back leaves app) — observed, not filed.
+- RED-013 → CLOSED: pauses gone from code; measured fixture submit→result 28ms (was ~640ms); keyframes + staged mapping intact; reduced-motion computes to none, verified live.
+- Regression: multi-claim 2nd-claim evaluation ✓ ("Over speeding" audited); INSUFFICIENT renders with fixture badge ✓; AWS-down banner ✓; mobile 390 zero overflow ✓; console/page errors ZERO across all rounds ✓; suite 64/64 ✓.
+- No new findings. Per instruction no new P2s filed after the gate.
+
+**UI RELEASE GATE — PASS** (UI scope: flows, states, honesty, preservation, responsive, console, motion). Overall release still FAIL solely on RED-001 (Mode A). Zero open P1s/P2s. UI surface frozen barring regression.
+
+NEXT:
+Only triggers left: creds → LIVE checklist L-01..L-11; REDTEAM retest only on regression or new BUILD/UI output. Standing: secret_scan at freeze; canonical run still empty; video unrecorded.
+
 ## 23:15 — BUILD
 
 TASK:
@@ -492,6 +542,35 @@ Will check the poll result and retry manually if it hasn't self-reported. If Bed
 BLOCKERS:
 Bedrock invocation still account-gated (AWS-side, not human-actionable right now — no pending click, payment, or MFA). Not P0-01 in the old sense (creds exist now) — this is a new, narrower blocker one level deeper.
 
+## 2026-09-18 21:12 UTC — UI (baseline and ownership)
+
+AGENT: UI
+TASK: Frontend experience rebuild under the user's explicit Agent 4 instruction; this authorizes presentation work despite the older UI_READY=false gate. It does not establish live AWS verification.
+CHANGED: Claimed frontend presentation, interactions, responsive design, and browser verification.
+VERIFIED: Clean baseline at b423079; read DECISION, AI_COORDINATION, TASK_BOARD, QA_REPORT, DEMO, and AGENT_LOG. Started Vite and exercised the original fixture-to-report path in real headless Chrome. Inspected all six fixture definitions, all four result states, explicit claim-selection logic, existing request shape, and honest AWS_NOT_CONFIGURED path.
+ISSUES: Original UI had no evidence viewer, minimal loading feedback, and lost inputs when navigating back from results. Fixture scenarios contain observations but no source photographs. Live endpoint is not configured.
+NEXT: Rebuild around claim / evidence / observation / deterministic conclusion with honest source labeling.
+BLOCKERS: Live Bedrock verification remains BUILD-owned; no blocker to non-live UI work.
+
+## 2026-09-18 21:40 UTC — UI (implementation and second verification pass)
+
+AGENT: UI
+TASK: Premium evidence-review experience, resilient failure states, motion, and demo/browser readiness.
+CHANGED: frontend/src/App.jsx; App.css; index.css; components/ReviewPrimitives.jsx; frontend/index.html and public/favicon.svg. Warm paper/ink design system, editorial typography, responsive app frame, tactile validated image dropzone, persistent input state, explicit claim cards, another-claim shortcut, actual-operation analysis stages, four distinct result treatments, evidence preview/expand dialog, structured observation table, uncertainty module, technical disclosure, trust/error components, page metadata and product favicon. No new production dependencies.
+VERIFIED:
+- Real Chrome via Playwright at 390x844, 430x932, 768x1024, 1440x900: all six fixture scenarios; all four result states; no horizontal overflow. Captured and inspected screenshots.
+- Multi-claim: no preselected radio, continue disabled until choice, both claims evaluated separately, another-claim route resets selection. Retains source inputs when returning.
+- Real unconfigured API path: explicit AWS unavailable / UNKNOWN status, no fallback, image and text preserved after error.
+- Image upload: unsupported PDF, corrupt image, image preview, expanded native dialog, Escape close. Manual text entry / PDF extraction limitations are explicit.
+- Isolated browser-intercepted endpoint tests (NOT live AWS): incomplete JSON envelope, HTTP 503, real 30-second timeout, ignored late response, unknown claim -> unsupported report, image on report, unchanged POST /audit payload keys imageBase64 + mimeType. Test response source is ui-test, never bedrock.
+- Keyboard radio selection/arrow navigation; reduced-motion mode; axe scans of landing, selection, all four report states, and error/upload screen returned zero violations after contrast remediation.
+- Browser console / page errors clean in main-flow runs. Frontend build and lint pass. Existing root suite: 64/64 pass. git diff --check clean.
+ISSUES: No known UI P0/P1. AWS success remains unverified. Fixture evidence panel deliberately says no source photograph; no fabricated imagery, highlights, observations, progress percentages, or live status.
+NEXT: BUILD should supply a configured live endpoint and verified source photographs for the live demo. LEAD should reconcile the old no-shortcut note in AI_COORDINATION and the screenshot/PDF extraction steps in DEMO against the actual image + manual-text interface. Recommendations only; those owned files were not changed.
+BLOCKERS: A genuine live observation demo still depends on BUILD/AWS. Current UI is ready for explicitly labeled fixture demonstration.
+
+Verification artifacts: scratch Playwright scripts ui-smoke.mjs / ui-edge.mjs and screenshots under /var/folders/13/0k9vbdm12j5g2c8nbk74y2s40000gn/T/opencode/. Test-only Vite server on 5174 used VITE_API_BASE_URL=/api with browser route interception and was stopped after verification; normal app remains on 5173. No API/environment setting was saved to the repository. Work left uncommitted because no commit was explicitly requested.
+
 ## 23:35 — BUILD
 
 TASK:
@@ -524,3 +603,15 @@ Waiting for either: (a) the poll to succeed on its own, (b) the human to escalat
 
 BLOCKERS:
 Bedrock invocation account-gated ~2 hours now. Human-relevant: optional escalation via aws-verification@amazon.com if they want to expedite; otherwise this may just need more time.
+
+## 2026-09-19 06:35 UTC — UI (RED-012 / RED-013 final fix; feature freeze)
+
+AGENT: UI
+TASK: Fix only source-image visibility/persistence and artificial processing delays.
+CHANGED: frontend/src/App.jsx only (plus this log). The existing upload control is shared with fixture mode as an optional user-provided source image. Fixture submissions carry the File through selection/report; the report no longer discards it when meta.source is fixture. Source image and fixture observations have separate provenance labels; fixture reports say "Demo fixture — not live AWS evidence" and explicitly state observations are not derived from the image. No supplied image still produces the honest placeholder. Removed the 180/220/240ms sleeps; deterministic evaluation is synchronous, while actual network requests retain pending/error/timeout state. Existing CSS transitions, palette, layout, viewer, and backend/API remain unchanged.
+VERIFIED: RED-012 PASS; RED-013 PASS. Real Chrome/Playwright at 1440x900, 768x1024, 390x844, each with normal and reduced motion. SHA-256 comparisons confirm identical uploaded bytes in preview, expanded viewer, all four result states, after claim-selection back/forward, another-claim navigation, and repeated AWS-unavailable error/retry. Missing-image fixture still shows placeholder. No horizontal overflow; screenshots inspected; browser console/page errors clean. Fixture report DOM ready in 6.4–14.1ms (24 measured runs), without waiting for decorative animations. Production build, lint, git diff --check pass. No backend or API adapter diff.
+ISSUES: No known open UI P0/P1. Fixtures still have no legitimate bundled source photographs; none were fabricated. Test upload was a previously captured app screenshot, used only to verify image preservation, not represented as traffic evidence. Live AWS success remains outside this verification.
+NEXT: FRONTEND FEATURE FREEZE. No further redesign, pages, animations, or features. REDTEAM may independently retest findings; its QA_REPORT/TASK_BOARD changes were preserved.
+BLOCKERS: None for these fixes. Verified live AWS remains a separate BUILD dependency.
+
+Evidence: /var/folders/13/0k9vbdm12j5g2c8nbk74y2s40000gn/T/opencode/ui-final-fix.mjs and final-source-*.png. No new assets or test-only source images were added to the product.

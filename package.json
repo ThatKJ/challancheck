@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "spike:bedrock": "node scripts/bedrock-spike.js"
+    "spike:bedrock": "node scripts/bedrock-spike.js",
+    "server": "node backend/server.js",
+    "check:bedrock-text": "node scripts/bedrock-text-check.js"
   },
   "devDependencies": {
     "vitest": "^5.0.1"

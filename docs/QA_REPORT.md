@@ -1,6 +1,8 @@
 # QA Report — Red Team (Agent 3)
 
-Verdict: **NOT A RELEASE CANDIDATE** — 1 open P0 (RED-001 live AWS), 2 open P1s (RED-003 copy residuals, RED-009 fuzzy false-positives), 1 open P2 (RED-011 preselect). Retested 2026-09-18 against committed revision 0da52f1/364f9e2 — every closure below rests on fresh execution evidence, regardless of prior status.
+Verdict: **NOT A RELEASE CANDIDATE (overall)** — sole open item is RED-001 (live AWS P0; blocks Mode A only). Zero open P1s, zero open P2s. All closures below rest on fresh execution evidence (final sweep 2026-09-19: live headless-Chrome drive-throughs + 64/64 suite).
+
+**UI RELEASE GATE — PASS.** Scope: upload flow, claim selection, transitions, all 4 result states reachable, AWS-down honesty, input preservation, responsiveness (1440/1280/768/390), console (zero errors), fixture labeling, motion + reduced-motion. Verified live in a real browser; screenshots read. No new polish tasks will be filed from UI — gate is frozen.
 
 Audit revisions: first sweep `e94b94d` (23 files, docs+scaffold); retest sweep `0da52f1` (backend, adapters, 3-screen frontend, 62-test suite).
 
@@ -34,10 +36,7 @@ Actual: (a) README "What We Built" describes a system that is not built. (b) "fr
 Reproduction: grep `accurate|detects|proves|invalid|wrong|legal|fraud|guaranteed|real-time|automatic|reliable|incorrect` → hits are problem-framing + unbuilt capability claims.
 Evidence: README:10-14, DECISION.md:7, DEMO.md:6-10, CANONICAL_RUN.md stub.
 Recommended smallest fix: tense-guard ("will"/"planned") until P0-02/P0-04 land; quantify-or-drop "frequently"; define confidence semantics in the observation-schema task (P0-03) before DEMO promises numbers.
-Status: OPEN (narrowed 2026-09-18) — DECISION:22 fixed ✓ (verified future-tense). Two NEW residuals in README, both verified by read:
-(a) README:10 "The deterministic engine currently extracts visual facts" — inaccurate: the engine evaluates observations, it never extracts; nothing extracts yet. Fix: "currently evaluates observations and identifies mismatches".
-(b) README:39 "Amazon Bedrock used for multimodal image observation" — present-tense, unconditional, FALSE (zero Bedrock calls have ever been made). Fix: "(If Mode A)" like SUBMISSION:19.
-Mode B submission copy (SUBMISSION:14-15 "(via mocked integration)", honest incomplete-pipeline note; DEMO:7 adapter-conditional; DEMO:12 limitations beat) verified clean — good disclosure, do not touch.
+Status: CLOSED 2026-09-19 — all residuals verified fixed (DECISION:22 future-tense; README:10 "evaluates observations"; README:39 "(If Mode A)"). claims_audit re-run shows only Mode-A-conditional and historical-hits noise. P1-08 may return to DONE.
 
 ## ID: RED-004
 Severity: P1
@@ -112,7 +111,8 @@ Evidence: `tests/adversarial/classifier_traps.json` CT-08..CT-11 + runner (REDTE
 Recommended smallest fix: input normalization (hyphen→space, collapse repeats) + token-level fuzzy match (e.g. edit-distance ≤1 on keywords `helmet|without|speed|limit|signal|light`) with tests; keep CT-01..CT-04 guards passing (fuzzy must not resurrect false claims — "helmett"→slug today is CORRECT, don't over-match it into WITHOUT_HELMET without a negation cue).
 Out of scope (P2 note): Hindi-English mix ("bina helmet ke challan", "helmet nahi pehna tha") also slugs today. Only fix if LEAD declares Hindi support; otherwise document English-only input.
 Retest 2026-09-18 vs 0da52f1: CT-08/09/10 now match ✓, CT-01..07 still suppressed ✓ (fuzzy did not resurrect the false claims — the key safety property holds). BUT the fuzzy path introduced two NEW false-claim variants (executed): "All signals working normally" → RED_LIGHT_JUMP (plural→keyword correction fabricates a claim from descriptive text) and "speed limits observed" → SPEEDING (compliance-sounding, no offence cue — same class as CT-02). Encoded as failing CT-12/CT-13 (suite 62/64). Known safe-direction residuals (not encoded): space-drop ("nohelmet") and cue-corruption ("missng helmet") still slug — diminishing returns, revisit only if OCR source shows these shapes.
-Status: OPEN (narrowed: original OCR gap fixed; fuzzy over-correction gap new)
+Retest round 2 (2026-09-19 vs b423079): CT-12/13 now suppressed ✓ with all positives intact — "Jumping red light / signal violation", "Signal jumped at intersection", "Red light violation captured", "Beat the signal" all still match (independently probed, executed); suite 64/64. The cue-requirement fix is tight, not over-broad.
+Status: CLOSED (OCR + fuzzy false-claim classes verified fixed)
 
 ## ID: RED-010
 Severity: P1 (guidance sentence) / P2 (title)
@@ -136,11 +136,34 @@ Actual: `useState(candidateClaims[0])` pre-checks the first candidate with Conti
 Reproduction: read App.jsx:109-110,140-142.
 Evidence: same file.
 Recommended smallest fix: `choice` starts null, Continue disabled until a radio is picked. Two-line change, zero logic impact.
-Status: OPEN (P2 — fix if time, does not block demo)
+Retest 2026-09-18/19 vs b423079 (code + LIVE browser): `useState(null)` + `disabled={!choice}` in source (App.jsx:289,340); CDP click-through to claim screen shows 2 options, both radios empty, Continue disabled=true (executed). Fix verified where it matters — in the running UI, not just the diff.
+Status: CLOSED (explicit-selection enforced end-to-end)
+
+## ID: RED-012
+Severity: P1
+Claim/Component: Fixture result screen — evidence presentation (demo strength)
+Expected: The strongest visual beat ("but THIS is the attached evidence") lands visually; the result screen's largest slot shows the evidence, not an apology for its absence.
+Actual: In fixture mode the evidence column's top slot (~240px tall, first thing under the verdict) is the honest-but-empty "No source photograph" placeholder. A judge hears "photographic evidence" throughout the demo but never sees any photograph — the UI tells ("Car, 95%") rather than shows. Verified by live headless-Chrome screenshot of the rendered result screen (CDP click-through, 1440px). Nothing is dishonest; the impact gap is purely visual persuasion, which is exactly what Best-UI judges score.
+Reproduction: CDP drive-through (scripts live in /tmp, not repo): fixture car_no_helmet → result screenshot shows placeholder occupying the evidence slot.
+Evidence: `/tmp` screenshots (s3_single); `EvidenceViewer file={null}` branch (ReviewPrimitives.jsx:127-139).
+Recommended smallest fix (pick one, labeling constraints mandatory): (a) per-scenario clearly-labeled ILLUSTRATIVE image ("Illustrative photo — not analyzed, not evidence") so the visual beat exists without confusing fixture for live; or (b) demote the placeholder (collapse to a one-line fixture tag) and promote the observation table into the top slot. (a) is stronger for demo; (b) is safer. Either keeps all existing NON-LIVE tags.
+Retest (2026-09-19, live headless-Chrome CDP drive-through + screenshots read): the actionable half of this finding — the REAL-image path — is fully verified: uploading hero.png renders the identical file (blob URL, correct filename alt, unaltered pixels, no overlays/highlights) in the compact preview; live submit fails honestly (AWS_NOT_CONFIGURED banner + UNKNOWN line, both rendered); claim text + file survive error AND retry; observation table reproduces fixture data verbatim (Car 95%, KA01AB1234 80% — spot-checked against fixtureAdapter). Fixture mode stays imageless BY DESIGN (no photograph exists to show; placeholder + 4 companion NON-LIVE tags intact) — inventing illustrative imagery this close to video would add confusion surface, so the residual is accepted as designed: demo shows the photo via the UPLOAD path (real file renders), fixture path stays schematic. Result-with-uploaded-image is unreachable without a backend (live path always errors) — verified by component equivalence (same EvidenceViewer, same props shape) rather than end-to-end. Noted limit (not a finding): SPA has no routing, so browser back/forward leaves the app.
+Status: CLOSED (real-image path verified live; fixture-imageless accepted as designed, honestly labeled)
+
+## ID: RED-013
+Severity: P2
+Claim/Component: Analysis overlay timing in fixture mode (motion review)
+Expected: Motion aids comprehension; nothing theatrical or time-wasting, especially inside a 3-minute demo.
+Actual: Motion language is GOOD — staged steps map 1:1 to the real pipeline (claim → observations → rules → report), aria-live announces progress, reduced-motion fully disables, skeleton/shimmer/breathe are subtle. But fixture mode burns ~640ms in hardcoded pauses (180+220+240) for fully synchronous local work, with checkmarks implying computation ("Load fixture observations" takes 220ms to "load" a JS object). Labeled non-live throughout, so honest — just slow theater. Verified by code read (App.jsx:573,617,598,601) + live timing.
+Reproduction: read pauses; click-through shows staged overlay on every fixture run.
+Evidence: same lines; overlay copy itself ("Non-live example · no Bedrock request is being made") is exemplary.
+Recommended smallest fix: skip/shorten pauses when mode==fixture (e.g. 60ms per stage — enough to perceive the step mapping, ~180ms total). Keep all animations and copy untouched.
+Retest (2026-09-19): pauses REMOVED from code (no `pause(` remains; evaluate/submit advance stages synchronously; only the legitimate 30s TIMEOUT guard stays). Measured live: fixture submit→result in 28ms (was ~640ms). Motion language intact (reveal/shimmer/breathe keyframes present; staged steps still map the pipeline for genuine live waits); reduced-motion verified LIVE (emulated → report animation computes to none). Overlay now flashes past in fixture mode — correct, since nothing loads.
+Status: CLOSED (timing fixed + motion verified)
 
 ## Release gate
 
-RELEASE CANDIDATE — **FAIL**. Blocking P0: RED-001 (live AWS; blocks Mode A only). Blocking P1 until fixed-or-formally-accepted: RED-003 (README:10/:39 residuals), RED-009 (CT-12/13 fuzzy false-positives). Mode B demo path (fixture E2E) is verified working and honestly labeled — the video can proceed on Mode B while these close. Canonical run still empty; video unrecorded; pre-video browser console check still owed.
+RELEASE CANDIDATE — **FAIL (overall, solely on RED-001 live AWS; Mode A only)**. Every other finding CLOSED on execution evidence. **UI RELEASE GATE — PASS** (see Verdict): the Mode B demo surface is verified and frozen — no further UI findings will be filed barring regression. Still owed outside UI scope: canonical run content, the video recording itself, secret_scan at freeze.
 
 ## Handoff pointer
 
