@@ -46,7 +46,7 @@ longer presented as one.
 ## 2. Live AWS attempt — 2026-09-19, about 14:23 UTC
 
 ```
-AWS IDENTITY:          resolves — account 623234913135, short-lived `aws login` credentials
+AWS IDENTITY:          resolves — the team's AWS account (id omitted), short-lived `aws login` credentials
                        (no long-lived keys were created)
 REGION:                ap-south-1
 MODEL / PROFILE:       global.anthropic.claude-sonnet-5  (system-defined inference profile,

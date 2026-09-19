@@ -4,7 +4,7 @@
 // image; the actual Bedrock call logic lives in bedrockAdapter.js so the server
 // and this script never drift apart.
 //
-// STATUS: no invocation has succeeded yet. Account 623234913135 is gated:
+// STATUS: no invocation has succeeded yet. The team's AWS account is gated:
 // `ValidationException: Operation not allowed` for every model/region, with
 // authorizationStatus NOT_AUTHORIZED and applied Bedrock quotas of 0
 // (docs/TASK_BOARD.md P0-01). Nothing here is a verified result until it prints.
