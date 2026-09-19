@@ -26,7 +26,7 @@ ChallanCheck helps drivers compare the cited violation in an e-Challan with obse
 
 ## Architecture & AWS Integration
 The system relies on a strict trust boundary between visual observation and deterministic evaluation. This is a major technical differentiator:
-- **Amazon Bedrock (Visual Observation Only)**: The Bedrock integration performs multimodal visual observation on the traffic camera evidence to extract strictly factual data (vehicle type, helmet presence). The model makes no legal judgements.
+- **Amazon Bedrock (Visual Observation Only)**: The Bedrock integration is designed to perform multimodal visual observation on the traffic camera evidence to extract strictly factual data (vehicle type, helmet presence) in live AWS mode. The model makes no legal judgements. (Note: Currently running in local fixture mode pending AWS account verification).
 - **Application Engine (Deterministic Evaluation)**: Application rules deterministically compare the structured factual observations against the selected claim to produce consistent, reliable outcomes.
 
 ## Setup & Running Locally
@@ -52,4 +52,9 @@ npm run dev
 
 ## AI Tools Used
 - Antigravity AI agents used for product ideation, task management, code generation, and verification.
-- (If Mode A): Amazon Bedrock used for multimodal image observation.
+- Amazon Bedrock (Live AWS Mode) used for multimodal image observation.
+
+## Known Limitations
+- **Does Not Determine Guilt**: The system strictly flags observable inconsistencies between facts and claims; it does not determine guilt, innocence, or legal validity.
+- **No Guarantee of Success**: The output report is an evidence consistency summary and does not guarantee a successful grievance resolution.
+- **Current Deployment**: Running locally (Mode B) pending AWS account credential verification for live Bedrock inference.
