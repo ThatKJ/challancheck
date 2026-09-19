@@ -32,6 +32,22 @@ const stateStyle = {
   UNSUPPORTED_CHECK: ["unsupported", "limit"],
 };
 
+// Honest restatement only: every value below is already on screen elsewhere in
+// the report (canonical claim, observation fields, verdict title). Nothing new
+// is inferred here — the band just makes CLAIMED vs OBSERVED vs RESULT
+// impossible to miss.
+function observedSummary(observation, canonicalClaim) {
+  if (!observation) return "Not available";
+  const vehicle = humanize(observation.vehicle_type?.value);
+  if (canonicalClaim === "WITHOUT_HELMET") {
+    return `${vehicle} · helmet ${humanize(observation.helmet?.status)}`;
+  }
+  const plate = observation.license_plate?.visible
+    ? `plate ${observation.license_plate.text || "visible, unreadable"}`
+    : "plate not visible";
+  return `${vehicle} · ${plate}`;
+}
+
 function UploadScreen({ onSubmit, loading, error, onDismissError }) {
   const [mode, setMode] = useState("fixture");
   const [fixtureId, setFixtureId] = useState(FIXTURE_SCENARIOS[0].id);
@@ -50,8 +66,8 @@ function UploadScreen({ onSubmit, loading, error, onDismissError }) {
       );
       return;
     }
-    if (next.size > 10 * 1024 * 1024) {
-      setFileError("This image exceeds 10 MB. Choose a smaller image.");
+    if (next.size > 5 * 1024 * 1024) {
+      setFileError("This image exceeds 5 MB. Choose a smaller image.");
       return;
     }
     if (!next.size) {
@@ -263,7 +279,7 @@ function UploadScreen({ onSubmit, loading, error, onDismissError }) {
                     ? `${(file.size / 1024).toFixed(0)} KB · Click to replace`
                     : "or click to choose a file"}
                 </span>
-                <small>JPG, PNG, WebP · up to 10 MB</small>
+                <small>JPG, PNG, WebP · up to 5 MB</small>
               </button>
               {fileError && (
                 <p className="field-error" role="alert">
@@ -509,6 +525,27 @@ function ResultScreen({ report, meta, file, claims, onOtherClaim, onBack }) {
           <br />
           evaluated
         </span>
+        <div
+          className="verdict-band"
+          aria-label="Claimed, observed, and result summary"
+        >
+          <div className="verdict-cell">
+            <span className="eyebrow">Claimed</span>
+            <strong className="verdict-claim">
+              {claimName(violation.canonicalClaim)}
+            </strong>
+          </div>
+          <div className="verdict-cell">
+            <span className="eyebrow">Observed</span>
+            <strong className="verdict-observed">
+              {observedSummary(observation, violation.canonicalClaim)}
+            </strong>
+          </div>
+          <div className="verdict-cell">
+            <span className="eyebrow">Result</span>
+            <strong>{presentation.title}</strong>
+          </div>
+        </div>
       </div>
       <div className="report-grid">
         <div className="evidence-column">
@@ -595,7 +632,14 @@ function App() {
   const [data, setData] = useState(null);
   const [report, setReport] = useState(null);
   const main = useRef(null);
+  const prevScreen = useRef(screen);
   useEffect(() => {
+    // Move focus to the new screen on transitions only — not on initial mount,
+    // so keyboard users still meet the skip link as their first Tab stop.
+    // (Compares against the previous screen rather than a first-render flag so
+    // StrictMode's dev double-effect can't defeat the guard.)
+    if (prevScreen.current === screen) return;
+    prevScreen.current = screen;
     main.current?.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [screen]);

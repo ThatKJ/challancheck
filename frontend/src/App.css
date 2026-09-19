@@ -1294,3 +1294,172 @@ textarea {
     scroll-behavior: auto !important;
   }
 }
+
+/* ===== Final finishing pass (behavior unchanged) ===== */
+/* Spatial depth, verdict band, motion polish. All animation/transition below
+   is silenced by the prefers-reduced-motion rule above; pointer tilt is
+   additionally JS-guarded to fine pointers only. */
+
+.intake-panel {
+  box-shadow:
+    0 1px 2px #263d340a,
+    0 12px 36px #263d3414,
+    0 36px 72px -36px #263d342b;
+}
+.dropzone {
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.dropzone:hover,
+.dropzone.dragging {
+  box-shadow: 0 10px 24px -12px #263d3433;
+}
+.dropzone.has-file {
+  border-color: #4c6946;
+  background: #f1f5eb;
+}
+.primary-button {
+  box-shadow: 0 14px 30px -18px #263d3466;
+}
+.primary-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px -18px #263d3455;
+}
+.primary-button svg {
+  transition: transform 0.2s ease-out;
+}
+.primary-button:hover:not(:disabled) svg {
+  transform: translateX(4px);
+}
+
+/* Result hero: layered depth + per-state spine motifs (shape, not just color:
+   mismatch = double contrast rule, insufficient = dashed withheld rule,
+   unsupported = dotted limit rule, consistent = calm solid). */
+.result-hero {
+  flex-wrap: wrap;
+  box-shadow:
+    0 30px 70px -30px #263d3438,
+    0 2px 8px #263d3412,
+    inset 0 1px 0 #ffffffb0;
+}
+.mismatch {
+  border-left: 4px double var(--tone);
+}
+.insufficient {
+  border-left: 4px dashed var(--tone);
+}
+.unsupported {
+  border-left: 4px dotted var(--tone);
+}
+.result-icon {
+  box-shadow:
+    inset 0 1px 0 #ffffff90,
+    0 6px 16px -8px var(--tone);
+}
+
+/* Verdict band: CLAIMED vs OBSERVED vs RESULT restated as one composition.
+   Values only — every string already appears elsewhere in this report. */
+.verdict-band {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--tone-border);
+}
+.verdict-cell {
+  padding: 2px 24px;
+  border-left: 1px solid var(--tone-border);
+}
+.verdict-cell:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.verdict-cell .eyebrow {
+  color: var(--tone);
+  font-size: 9px;
+}
+.verdict-cell strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 19px;
+  font-weight: 550;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+.verdict-claim {
+  text-transform: capitalize;
+}
+
+/* Evidence plane: dark matte + depth when a real photograph is present;
+   subtle pointer parallax via --rx/--ry (JS, fine pointers only). */
+.evidence-viewer.has-image {
+  background: #22291f;
+  border-color: #263d34;
+  transform: perspective(1100px) rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg));
+  transition:
+    transform 0.3s ease-out,
+    box-shadow 0.3s ease-out;
+  box-shadow:
+    0 24px 54px -24px #263d3440,
+    0 2px 8px #263d3414;
+}
+.evidence-viewer > img {
+  animation: imgIn 0.6s ease-out both;
+}
+@keyframes imgIn {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Claim selection: staggered entrance (backwards fill so hover transforms
+   still win after the entrance) + lifted selected state. */
+.claim-option {
+  animation: reveal 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.claim-option:nth-of-type(1) {
+  animation-delay: 0.05s;
+}
+.claim-option:nth-of-type(2) {
+  animation-delay: 0.12s;
+}
+.claim-option:nth-of-type(3) {
+  animation-delay: 0.19s;
+}
+.claim-option:hover {
+  box-shadow: 0 12px 28px -16px #263d3440;
+}
+.claim-option.selected {
+  box-shadow:
+    0 14px 30px -16px #38543655,
+    inset 3px 0 #4c6946;
+}
+
+@media (max-width: 600px) {
+  .verdict-band {
+    grid-template-columns: 1fr;
+    margin-top: 20px;
+    padding-top: 6px;
+  }
+  .verdict-cell {
+    padding: 14px 0;
+    border-left: 0;
+    border-top: 1px solid var(--tone-border);
+  }
+  .verdict-cell:first-child {
+    border-top: 0;
+  }
+  .verdict-cell strong {
+    font-size: 17px;
+  }
+}

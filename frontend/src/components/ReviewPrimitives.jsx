@@ -86,6 +86,7 @@ export function EvidenceViewer({ file, compact = false }) {
   const preview = useRef(null);
   const expanded = useRef(null);
   const dialog = useRef(null);
+  const frame = useRef(null);
   useEffect(() => {
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
@@ -93,11 +94,50 @@ export function EvidenceViewer({ file, compact = false }) {
     if (expanded.current) expanded.current.src = objectUrl;
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
+  useEffect(() => {
+    // Subtle pointer parallax on the evidence plane: desktop pointers only,
+    // disabled entirely under prefers-reduced-motion. Progressive enhancement —
+    // without it the viewer is a static framed image.
+    const el = frame.current;
+    if (!el || !file) return;
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const onMove = (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        el.style.setProperty("--rx", `${(-y * 4).toFixed(2)}deg`);
+        el.style.setProperty("--ry", `${(x * 6).toFixed(2)}deg`);
+      });
+    };
+    const onLeave = () => {
+      cancelAnimationFrame(raf);
+      el.style.setProperty("--rx", "0deg");
+      el.style.setProperty("--ry", "0deg");
+    };
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerleave", onLeave);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerleave", onLeave);
+    };
+  }, [file]);
   return (
-    <div className={`evidence-viewer ${compact ? "compact" : ""}`}>
+    <div
+      ref={frame}
+      className={`evidence-viewer ${compact ? "compact" : ""} ${file ? "has-image" : ""}`}
+    >
       {file ? (
         <>
-          <img ref={preview} alt={`Uploaded evidence: ${file.name}`} />
+          <img
+            key={`${file.name}-${file.size}-${file.lastModified}`}
+            ref={preview}
+            alt={`Uploaded evidence: ${file.name}`}
+          />
           <button
             className="expand-button"
             type="button"
