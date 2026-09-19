@@ -120,4 +120,5 @@ All of the following must be true, in this order. Until then the README, submiss
 | `sh scripts/verification/secret_scan.sh` | exit 0 |
 | `sh scripts/verification/claims_audit.sh` | advisory grep; every hit reviewed, see `docs/QA_REPORT.md` |
 | Static bundle | the default `npm run build` contains no live-backend code and no AWS SDK; a build with `VITE_API_BASE_URL` set adds the `fetch` path but still bundles no SDK (checked by grepping the built JS) |
-| Browser E2E | not available on `main` (no `test:e2e` script); UI was verified live in a browser earlier (`docs/QA_REPORT.md`, RED-012/013) |
+| Demo cases in a real browser | Chrome driven by Playwright against the Vite dev server, 2026-09-19. Case A shows "Evidence Mismatch Found" (claimed "Riding Without Helmet", observed "car · helmet not applicable", Vehicle type Car 95%); Case B shows "Insufficient Evidence" (helmet Uncertain 30%, "We won't guess"). Both show the "Demo fixture — not live AWS evidence" badge and the "Evidence consistency, not a legal verdict" note. Zero console or page errors. The driver script is not committed. |
+| Committed browser E2E | not available on `main` (no `test:e2e` script); the earlier live-browser QA is in `docs/QA_REPORT.md` (RED-012/013) |
