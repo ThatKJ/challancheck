@@ -7,6 +7,8 @@
 **Submission mode: B — AWS not verified.** The observations shown in the demo come from a local fixture
 adapter, not from Amazon Bedrock. See [Current AWS status](#current-aws-status).
 
+**Deployed on AWS:** https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com (API Gateway → one Lambda, `ap-south-1`). The hosting and API are live and verified in a browser; **live Bedrock analysis from it is unavailable** because the AWS account refuses the call, so the live path returns a coded error and never fixture data. Its demo mode is the same labelled fixture demo.
+
 ## Who it helps
 
 Indian drivers who receive an automated e-Challan and want to check whether the attached photograph
@@ -73,7 +75,7 @@ SOURCE EVIDENCE → VISUAL OBSERVATION → STRUCTURED FACTS → DETERMINISTIC EV
 | Live image call (real PNG → local server → Bedrock) | **FAIL**: same error; HTTP 502 `AWS_ERROR`, no observation returned |
 | Applied quota, "Global cross-region model inference tokens per minute for Anthropic Claude Sonnet 5" | `0` (AWS default: `6,000,000`) |
 | Model authorization for this account | `NOT_AUTHORIZED` |
-| Deployed to AWS | no |
+| Deployed to AWS | **yes: the hosting/API shell** (API Gateway + Lambda, `ap-south-1`). A live image call through it is refused the same way: HTTP 502 `AWS_ERROR`, no observation. Record: [`docs/CANONICAL_RUN.md`](docs/CANONICAL_RUN.md) section 2b |
 
 We believe an account-level limit is the cause; we have not been able to lift it. **Not verified:** any successful
 Bedrock inference, a schema-valid live observation, latency, accuracy or repeatability.
@@ -82,30 +84,50 @@ unsupported-check behaviour, the UI, and the explicit failure path.
 
 ## Architecture
 
-**CURRENT** (what exists; runs locally, nothing is deployed to AWS)
+**CURRENT (what exists)**
+
+*Locally* (unchanged):
 
 ```
 React/Vite app ──┬─ "Explore an example" → fixture adapter (canned observation, no AWS call)
                  └─ "Upload evidence"    → POST /audit → local Node relay → Amazon Bedrock (unverified)
-                                              ↓
          schema validation → deterministic rule engine (same module, runs in the browser) → result
 ```
 
-**TARGET / FUTURE SHIP-IT** (design only; not built, not deployed)
+*Deployed on AWS* (`ap-south-1`, verified 2026-09-19, record in [`docs/CANONICAL_RUN.md`](docs/CANONICAL_RUN.md) section 2b):
 
 ```
-static frontend → API Gateway → Lambda (the same adapter) → Amazon Bedrock → deterministic rule engine
+browser ──► API Gateway (HTTP API) ──► one Lambda ──► Amazon Bedrock
+              POST /api/* throttled      · serves the built web app (static files)
+                                         · GET /api/health, POST /api/audit (image → observation relay)
 ```
 
-S3 would be added only if evidence had to be stored; the current relay does not persist images. No other AWS
-services are proposed. **Ship It readiness: BLOCKED** — it needs a verified AWS service path, a public URL and a
-deployed end-to-end run, and none exists.
+Public URL: https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
+The gateway and Lambda respond. **The Bedrock call made from the Lambda is refused by the AWS account** (the same
+`ValidationException: Operation not allowed`), so the deployed live path returns a coded `AWS_ERROR` (HTTP 502)
+and never an observation. The site's demo mode is the same labelled fixture demo, and nothing on it is presented
+as Bedrock output. The rule engine still runs in the browser.
+
+**TARGET (Ship It)** is this same shape with one difference: a successful Bedrock invocation. It is not claimed.
+
+**AWS services deployed:** API Gateway (HTTP API), Lambda, IAM (one least-privilege execution role), CloudWatch Logs,
+and one private S3 bucket that holds only the deployment zip. Nothing else is deployed.
+One Lambda serves both the static app and the API, so there is one origin (no CORS) and no separate hosting stack.
+
+**Cost drivers (no prices claimed):** the static files are small and served by the same request-driven function, so
+there is no always-on server; API Gateway and Lambda bill per request and nothing while idle; **Bedrock inference is
+the primary variable AI cost** (billed by tokens; unmeasured here because no call has succeeded); no database is
+used because the core flow persists nothing; and nothing runs idle.
+
+**Ship It readiness: PARTIALLY DEPLOYED, NOT READY.** A public URL, API Gateway and Lambda exist and were verified in a
+real browser. The product's real path (Bedrock analysis of the evidence) has not worked once, so a deployed
+end-to-end run does not exist.
 
 ## Demo / run locally
 
 ```
 npm install
-npm test                                # 11 files, 101 tests; no AWS account needed
+npm test                                # 13 files, 150 tests; no AWS account needed
 npm install --prefix frontend
 npm run dev --prefix frontend           # open the printed URL and choose "Explore an example"
 ```
@@ -119,6 +141,9 @@ VITE_API_BASE_URL=http://127.0.0.1:8799 npm run dev --prefix frontend
 ```
 
 Also: `npm run build --prefix frontend`, `npm run lint --prefix frontend`, `sh scripts/verification/secret_scan.sh`.
+
+Deploy to AWS (creates resources; design and cost drivers in [`infra/README.md`](infra/README.md)):
+`PREVIEW=1 bash infra/deploy.sh` shows the change set without applying it, then `bash infra/deploy.sh`.
 The demo script is [`docs/DEMO.md`](docs/DEMO.md); the submission write-up is [`docs/SUBMISSION.md`](docs/SUBMISSION.md).
 
 ## What we learned
@@ -130,15 +155,16 @@ Each point is a real event in this repository, told in full in [`docs/LEARNING.m
 3. **Fixture and live must never substitute for each other,** and failures must keep their real cause.
 4. **Region, model and account access are architecture.** We waited hours for a "propagation delay" while a quota sat at zero.
 5. **Contracts are tested across the boundary.** A 10 MB UI limit against a 5 MB server limit was invisible to each side's own tests.
+6. **Platform limits are part of the contract.** A 4.63 MB photo the UI accepted became a 6.47 MB request that the deployed gateway refused with a bare 413 (Lambda's request limit is 6 MB); the limit is now 3 MB.
 
 ## Known limitations
 
 - **AWS is unverified.** Bedrock has not returned a successful response; demo observations are canned fixtures and are not derived from any uploaded image.
 - **One supported check** (riding without helmet). Other recognised claims return `UNSUPPORTED_CHECK` by design.
-- **Manual claim entry, images only.** No OCR or PDF extraction in this build; JPG, PNG or WebP up to 5 MB, one photo per review.
+- **Manual claim entry, images only.** No OCR or PDF extraction in this build; JPG, PNG or WebP up to 3 MB, one photo per review.
 - **English claim wording only.** Mixed Hindi-English text is not recognised.
 - **One claim per review.** Other detected claims are reviewed separately.
-- **Not deployed.** It runs locally and is labelled "Development preview".
+- **Deployed as a shell only.** The public site and API are live, but live Bedrock analysis is unavailable (account refusal); the site is labelled "Development preview". The API is public and unauthenticated, throttled at the gateway.
 - **No legal conclusion.** It flags observable inconsistencies only. It does not determine guilt, innocence or legal validity, and it does not predict or promise any grievance outcome.
 - **Live accuracy is unmeasured.** Nothing here reports how a live model performs on real challan photos.
 

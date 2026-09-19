@@ -72,37 +72,55 @@ real AWS state. It has never completed a successful call, so live AWS mode is un
 
 ## Architecture: current vs target
 
-**CURRENT (what exists; runs locally, nothing is deployed to AWS)**
+**CURRENT (what exists)**
+
+*Locally* (unchanged):
 
 ```
 React/Vite app ──┬─ "Explore an example" → fixture adapter (canned observation, no AWS call)
                  └─ "Upload evidence"    → POST /audit → local Node relay → Amazon Bedrock (unverified)
-                                              ↓
          schema validation → deterministic rule engine (same module, runs in the browser) → result
 ```
 
-**TARGET / FUTURE SHIP-IT (design only; not built, not deployed)**
+*Deployed on AWS* (`ap-south-1`, verified 2026-09-19, record in `docs/CANONICAL_RUN.md` section 2b):
 
 ```
-static frontend → API Gateway → Lambda (the same adapter) → Amazon Bedrock → deterministic rule engine
+browser ──► API Gateway (HTTP API) ──► one Lambda ──► Amazon Bedrock
+              POST /api/* throttled      · serves the built web app (static files)
+                                         · GET /api/health, POST /api/audit (image → observation relay)
 ```
 
-The rule engine is the same module wherever it runs; today it executes in the browser, and it could move
-into the Lambda without change. S3 would be added only if evidence had to be stored; the current relay
-does not persist images. No other AWS services are proposed.
+Public URL: https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
+The gateway and Lambda respond. **The Bedrock call made from the Lambda is refused by the AWS account** (the same
+`ValidationException: Operation not allowed`), so the deployed live path returns a coded `AWS_ERROR` (HTTP 502)
+and never an observation. The site's demo mode is the same labelled fixture demo, and nothing on it is presented
+as Bedrock output. The rule engine still runs in the browser.
 
-**Ship It readiness: BLOCKED.** It needs a real AWS service path (unverified), a public deployed URL
-(none exists) and a deployed end-to-end run (none exists).
+**TARGET (Ship It)** is this same shape with one difference: a successful Bedrock invocation. It is not claimed.
+
+**AWS services deployed:** API Gateway (HTTP API), Lambda, IAM (one least-privilege execution role), CloudWatch Logs,
+and one private S3 bucket that holds only the deployment zip. Nothing else is deployed.
+One Lambda serves both the static app and the API, so there is one origin (no CORS) and no separate hosting stack.
+
+**Cost drivers (no prices claimed):** the static files are small and served by the same request-driven function, so
+there is no always-on server; API Gateway and Lambda bill per request and nothing while idle; **Bedrock inference is
+the primary variable AI cost** (billed by tokens; unmeasured here because no call has succeeded); no database is
+used because the core flow persists nothing; and nothing runs idle.
+
+**Ship It readiness: PARTIALLY DEPLOYED, NOT READY.** A public URL, API Gateway and Lambda exist and were verified in a
+real browser. The product's real path (Bedrock analysis of the evidence) has not worked once, so a deployed
+end-to-end run does not exist.
 
 ## What we learned
 
-Five real events, each traceable in this repository (`docs/LEARNING.md`):
+Six real events, each traceable in this repository (`docs/LEARNING.md`):
 
 1. **Let the model observe, and let the evaluator refuse.** A rule engine with no confidence gate turned a 60%-confidence "car" into a confident inconsistency; the observation now carries its doubt.
 2. **A false positive is worse than a miss.** Our own OCR-tolerance fix fabricated two claims that red-team traps caught.
 3. **Live and fixture adapters must never silently stand in for each other.** Provenance is a field, and failures keep their real cause.
 4. **Region, model and account access are architecture.** Inference-profile-only models and a zero applied quota cost us hours we spent waiting for "propagation".
 5. **Contracts must be tested across the boundary.** A 10 MB UI limit against a 5 MB server limit was invisible to each side's own tests.
+6. **Platform limits are part of the contract, and only the live platform shows them.** A 4.63 MB photo, which the UI accepted, became a 6.47 MB request that the deployed gateway refused with a bare 413 above Lambda's 6 MB limit before any of our code ran. The limit is now 3 MB, pinned by a test.
 
 ## AI disclosure
 
