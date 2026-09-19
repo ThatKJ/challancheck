@@ -66,8 +66,8 @@ function UploadScreen({ onSubmit, loading, error, onDismissError }) {
       );
       return;
     }
-    if (next.size > 5 * 1024 * 1024) {
-      setFileError("This image exceeds 5 MB. Choose a smaller image.");
+    if (next.size > 3 * 1024 * 1024) {
+      setFileError("This image exceeds 3 MB. Choose a smaller image.");
       return;
     }
     if (!next.size) {
@@ -279,7 +279,7 @@ function UploadScreen({ onSubmit, loading, error, onDismissError }) {
                     ? `${(file.size / 1024).toFixed(0)} KB · Click to replace`
                     : "or click to choose a file"}
                 </span>
-                <small>JPG, PNG, WebP · up to 5 MB</small>
+                <small>JPG, PNG, WebP · up to 3 MB</small>
               </button>
               {fileError && (
                 <p className="field-error" role="alert">
