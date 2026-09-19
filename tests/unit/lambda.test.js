@@ -90,7 +90,7 @@ describe("POST /api/audit: success path", () => {
     await handler(ev("POST", "/api/audit", { imageBase64: image }));
     expect(logs).toHaveLength(1);
     expect(logs[0]).not.toContain(image);
-    expect(JSON.parse(logs[0])).toMatchObject({ level: "info", status: 200, route: "/api/audit" });
+    expect(JSON.parse(logs[0])).toMatchObject({ level: "info", status: 200, route: "/audit" }); // one normalized name for /audit and /api/audit
   });
 });
 
@@ -173,12 +173,45 @@ describe("routing", () => {
     expect((await handler(ev("GET", "/assets/x.js"))).body).toBe("site:GET:/assets/x.js");
   });
 
-  it.each(["/audit", "/health"])("does NOT route un-prefixed %s to the API, so Bedrock is reachable only through /api/*", async (rawPath) => {
+  it("serves GET /health as JSON at the API root, not the web app's HTML (the single-page-app fallback must not swallow it)", async () => {
     site.mockClear();
     const { handler, observe } = make({ site });
-    const res = await handler(ev("POST", rawPath, { imageBase64: png64() }));
+    const res = await handler(ev("GET", "/health"));
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/application\/json/);
+    expect(parse(res)).toMatchObject({ status: "ok", mode: "live", fixtures: false });
+    expect(site).not.toHaveBeenCalled();
     expect(observe).not.toHaveBeenCalled();
-    expect(res.body).toBe(`site:POST:${rawPath}`);
+  });
+
+  it("serves POST /audit at the API root exactly like /api/audit (same handler, same contract)", async () => {
+    site.mockClear();
+    const { handler, observe } = make({ site });
+    const root = await handler(ev("POST", "/audit", { imageBase64: png64() }));
+    const prefixed = await handler(ev("POST", "/api/audit", { imageBase64: png64() }));
+    expect(root.statusCode).toBe(200);
+    expect(parse(root)).toEqual(parse(prefixed));
+    expect(observe).toHaveBeenCalledTimes(2);
+    expect(site).not.toHaveBeenCalled();
+  });
+
+  it("a failed POST /audit at the root is the same coded failure with no observation, never HTML", async () => {
+    const observe = vi.fn().mockRejectedValue(Object.assign(new Error("Bedrock call failed (ValidationException): Operation not allowed"), { code: "AWS_ERROR" }));
+    const { handler } = make({ observe, site });
+    const res = await handler(ev("POST", "/audit", { imageBase64: png64() }));
+    expect(res.statusCode).toBe(502);
+    expect(res.headers["content-type"]).toMatch(/application\/json/);
+    expect(parse(res).error.code).toBe("AWS_ERROR");
+    expect(parse(res)).not.toHaveProperty("observation");
+  });
+
+  it("405s (JSON, coded) a GET on /audit instead of serving the single-page app", async () => {
+    site.mockClear();
+    const { handler } = make({ site });
+    const res = await handler(ev("GET", "/audit"));
+    expect(res.statusCode).toBe(405);
+    expect(parse(res).error.code).toBe("METHOD_NOT_ALLOWED");
+    expect(site).not.toHaveBeenCalled();
   });
 
   it("405s a GET on /api/audit and 404s unknown /api routes", async () => {
@@ -214,5 +247,21 @@ describe("redactAwsIdentifiers", () => {
   it("leaves ordinary text and non-strings alone", () => {
     expect(redactAwsIdentifiers("Operation not allowed")).toBe("Operation not allowed");
     expect(redactAwsIdentifiers(undefined)).toBe("");
+  });
+});
+
+describe("infra guard: every route that can reach Bedrock has the tight throttle", () => {
+  const template = readFileSync(new URL("../../infra/template.yaml", import.meta.url), "utf8");
+  const esc = (k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  it.each(["POST /audit", "POST /api/{proxy+}"])("%s is its own route AND has ApiThrottle* route settings", (key) => {
+    expect(template).toMatch(new RegExp(`RouteKey: "${esc(key)}"`));
+    expect(template).toMatch(new RegExp(`"${esc(key)}":\\s*\\n\\s*ThrottlingRateLimit: !Ref ApiThrottleRateLimit\\s*\\n\\s*ThrottlingBurstLimit: !Ref ApiThrottleBurstLimit`));
+  });
+
+  it("the Bedrock-reaching handler paths are exactly the ones with routes (no path can slip onto $default)", () => {
+    const source = readFileSync(new URL("../../backend/lambda.js", import.meta.url), "utf8");
+    const audit = [...source.matchAll(/rawPath === "([^"]*audit[^"]*)"/g)].map((m) => m[1]).sort();
+    expect(audit).toEqual(["/api/audit", "/audit"]); // /api/audit is covered by POST /api/{proxy+}, /audit by POST /audit
   });
 });

@@ -29,8 +29,8 @@ Parameters:
     Type: Number
     Default: 3
     Description: >-
-      Sustained requests/second on POST /api/* (the routes that can reach Bedrock
-      and so spend money). Abuse and cost guard.
+      Sustained requests/second on EACH route that can reach Bedrock (POST /api/* and
+      POST /audit; each is throttled separately) and so spend money. Abuse and cost guard.
   ApiThrottleBurstLimit:
     Type: Number
     Default: 6
@@ -132,6 +132,16 @@ Resources:
       RouteKey: "POST /api/{proxy+}"
       Target: !Sub integrations/${Integration}
 
+  # The frontend contract is POST ${VITE_API_BASE_URL}/audit and GET /health (as on the
+  # local server). This route makes POST /audit work at the API root, with the SAME tight
+  # throttle: never through the looser $default route.
+  AuditRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "POST /audit"
+      Target: !Sub integrations/${Integration}
+
   DefaultRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
@@ -141,7 +151,7 @@ Resources:
 
   DefaultStage:
     Type: AWS::ApiGatewayV2::Stage
-    DependsOn: [ApiRoute, DefaultRoute]
+    DependsOn: [ApiRoute, AuditRootRoute, DefaultRoute]
     Properties:
       ApiId: !Ref HttpApi
       StageName: $default
@@ -151,6 +161,9 @@ Resources:
         ThrottlingBurstLimit: !Ref SiteThrottleBurstLimit
       RouteSettings:
         "POST /api/{proxy+}":
+          ThrottlingRateLimit: !Ref ApiThrottleRateLimit
+          ThrottlingBurstLimit: !Ref ApiThrottleBurstLimit
+        "POST /audit":
           ThrottlingRateLimit: !Ref ApiThrottleRateLimit
           ThrottlingBurstLimit: !Ref ApiThrottleBurstLimit
 

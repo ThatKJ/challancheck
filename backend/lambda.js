@@ -6,17 +6,24 @@
 // function only relays what Bedrock observed.
 //
 // One function serves the whole product on ONE origin, so there is no CORS:
-//   GET  /api/health   liveness + region/model; makes no AWS call
-//   POST /api/audit    { imageBase64, mimeType } -> { observation, meta }  (or a coded error)
-//   GET/HEAD anything else   the built web app (src/staticSite.js)
+//   GET  /health, /api/health   liveness + region/model; makes no AWS call
+//   POST /audit,  /api/audit    { imageBase64, mimeType } -> { observation, meta }  (or a coded error)
+//   GET/HEAD anything else      the built web app (src/staticSite.js)
+// The un-prefixed paths mirror the local server (backend/server.js) and the frontend's
+// contract (`${VITE_API_BASE_URL}/audit`); the /api/* forms are what the deployed web
+// app calls (VITE_API_BASE_URL=/api). Both are the SAME handler code.
 //
 // Deliberately NOT here:
 //  - any fixture/mock data: if Bedrock is unavailable the caller gets a coded
 //    error with a non-2xx status, never made-up observations (enforced by test).
 //  - credentials: the function uses its IAM execution role via the SDK default
 //    provider chain; nothing credential-shaped is read or returned.
-//  - un-prefixed API paths: POST /audit is NOT routed to Bedrock, so the only way
-//    to reach it is /api/*, the route API Gateway throttles tightly (infra/template.yaml).
+//  - an unthrottled path to Bedrock: every route that can reach it (POST /audit and
+//    POST /api/*) is its own API Gateway route with the tight throttle, so the looser
+//    static-file throttle on $default can never be used to spend Bedrock tokens
+//    (infra/template.yaml, guarded by tests/unit/lambda.test.js).
+//  - a health check that lies: an unknown extensionless path falls through to the
+//    single-page app, so /health and /audit MUST be matched before the static handler.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,7 +61,7 @@ export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site,
     const method = event.requestContext?.http?.method ?? "GET";
     const rawPath = event.rawPath ?? "/";
 
-    if (rawPath === "/api/health") {
+    if (rawPath === "/health" || rawPath === "/api/health") {
       if (method !== "GET") return json(405, errorBody("METHOD_NOT_ALLOWED", "Use GET."), { allow: "GET" });
       // Liveness only: no AWS call, and nothing about the account, credentials or Bedrock access.
       return json(200, {
@@ -67,7 +74,7 @@ export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site,
       });
     }
 
-    if (rawPath === "/api/audit") {
+    if (rawPath === "/audit" || rawPath === "/api/audit") {
       if (method !== "POST") return json(405, errorBody("METHOD_NOT_ALLOWED", "Use POST."), { allow: "POST" });
       try {
         const raw = event.body ?? "";
@@ -76,7 +83,7 @@ export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site,
         const result = await observe({ imageBase64, mimeType });
         log(
           JSON.stringify({
-            level: "info", route: "/api/audit", status: 200, bedrockMs: result.meta?.latencyMs ?? null,
+            level: "info", route: "/audit", status: 200, bedrockMs: result.meta?.latencyMs ?? null,
             totalMs: Date.now() - startedAt, modelId: result.meta?.modelId ?? null, region: result.meta?.region ?? null, type: mimeType, bytes,
           })
         );
@@ -84,7 +91,7 @@ export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site,
       } catch (err) {
         const { status, code, message } = describeError(err);
         // Never an `observation` on failure: no silent fixture/mock fallback. Logged text is redacted too.
-        log(JSON.stringify({ level: "error", route: "/api/audit", status, code, totalMs: Date.now() - startedAt, detail: redactAwsIdentifiers(err?.message ?? err) }));
+        log(JSON.stringify({ level: "error", route: "/audit", status, code, totalMs: Date.now() - startedAt, detail: redactAwsIdentifiers(err?.message ?? err) }));
         return json(status, errorBody(code, message));
       }
     }
