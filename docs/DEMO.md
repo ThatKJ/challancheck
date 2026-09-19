@@ -1,13 +1,13 @@
 # Final Demo Video Script (Max 3 Minutes)
 
-- **0:00–0:20**: Problem statement.
-- **0:20–0:35**: Show incorrect-looking claim/evidence example.
-- **0:35–0:50**: Upload screenshot/PDF to ChallanCheck.
-- **0:50–1:00**: Selected claim is extracted.
-- **1:00–1:20**: Observations are generated (via Bedrock or local adapter depending on AWS verification status).
-- **1:20–1:40**: Deterministic mismatch is flagged.
-- **1:40–1:55**: Evidence explanation.
-- **1:55–2:15**: Uncertainty Beat: Upload blurry evidence -> INSUFFICIENT EVIDENCE (refuses to guess).
-- **2:15–2:35**: Architecture explanation (Bedrock + Deterministic rules).
-- **2:35–2:50**: Limitations / responsible AI.
-- **2:50–3:00**: Closing and GitHub repo link.
+- **0:00–0:15**: USER + PROBLEM (When a challan claim and evidence do not appear to match, manual review is painful).
+- **0:15–0:30**: SHOW THE CHALLAN CLAIM (The penalty notice).
+- **0:30–0:45**: SHOW SOURCE EVIDENCE (The photographic evidence).
+- **0:45–1:15**: RUN CHALLANCHECK (Upload evidence and select the candidate violation claim).
+- **1:15–1:40**: SHOW REAL BEDROCK OBSERVATIONS (Model strictly extracts factual data).
+- **1:40–2:00**: SHOW DETERMINISTIC RESULT (Application code flags inconsistency).
+- **2:00–2:15**: SHOW INSUFFICIENT EVIDENCE TRUST CASE (Upload blurry evidence -> shows it refuses to guess).
+- **2:15–2:35**: SHOW AWS ARCHITECTURE (Bedrock for visual observation; deterministic rule engine for evaluation).
+- **2:35–2:50**: WHAT WE LEARNED (The importance of separating observation from legal inference).
+- **2:50–3:00**: CLOSING VALUE (ChallanCheck makes evidence comparison explicit and reviewable).
+

@@ -4,14 +4,30 @@
 ChallanCheck audits whether the photographic evidence attached to an e-challan is actually consistent with the claimed violation.
 
 ## The Problem
-Automated traffic cameras can issue incorrect e-Challans (e.g. fining a car driver for "no helmet"). Disputing them requires manually analyzing evidence and navigating a bureaucratic grievance portal.
+When the cited violation and the attached photographic evidence in an e-Challan do not appear to match, a driver must manually inspect the evidence, reason about the mismatch, and figure out what to do next.
+
+ChallanCheck makes that comparison explicit and reviewable.
+
+**BEFORE:**
+- Read the notice
+- Inspect the photo manually
+- Reason about the mismatch
+- Prepare an explanation manually
+
+**AFTER:**
+- Upload the e-Challan evidence
+- Select the candidate violation claim
+- See a structured evidence comparison
+- Understand the uncertainty of the observation
+- Export/use the evidence summary
 
 ## What We Are Building
-ChallanCheck is designed to be an Evidence Consistency Engine. The user uploads a screenshot of the e-Challan and its evidence photo. The deterministic engine currently evaluates observations and identifies mismatches (like "Car vs Helmet violation"), preparing a structured grievance packet.
+ChallanCheck helps drivers compare the cited violation in an e-Challan with observable facts in its photographic evidence. The system uses a deterministic engine that evaluates visual observations and flags inconsistencies, preparing a structured grievance packet.
 
-## AWS Integration
-- **Amazon Bedrock**: The Bedrock integration will perform multimodal visual observation on the traffic camera evidence to extract structured facts (vehicle type, helmet presence) WITHOUT making legal judgements.
-- **AWS Lambda / API Gateway**: Will act as the serverless backend for the rule engine.
+## Architecture & AWS Integration
+The system relies on a strict trust boundary between visual observation and deterministic evaluation. This is a major technical differentiator:
+- **Amazon Bedrock (Visual Observation Only)**: The Bedrock integration performs multimodal visual observation on the traffic camera evidence to extract strictly factual data (vehicle type, helmet presence). The model makes no legal judgements.
+- **Application Engine (Deterministic Evaluation)**: Application rules deterministically compare the structured factual observations against the selected claim to produce consistent, reliable outcomes.
 
 ## Setup & Running Locally
 
