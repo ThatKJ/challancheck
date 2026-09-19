@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  ChallanCheck. API Gateway HTTP API -> one Lambda that serves both the built web
+  app and the JSON API (/api/*) -> Amazon Bedrock (Converse). Same origin, so no
+  CORS. Stateless: no database, queue or bucket at runtime. Credentials are the
+  function's IAM role only; no access keys exist anywhere.
+
+Parameters:
+  BedrockModelId:
+    Type: String
+    Default: global.anthropic.claude-sonnet-5
+    Description: >-
+      Inference-profile ID the function invokes. Must match the model the adapter
+      (backend/src/bedrockAdapter.js) builds its request for: it sends Anthropic's
+      Messages format, so this must be an Anthropic model.
+  BedrockFoundationModelId:
+    Type: String
+    Default: anthropic.claude-sonnet-5
+    Description: >-
+      Underlying foundation model behind the profile. IAM must allow InvokeModel
+      on the profile AND on this model in each region the profile routes to.
+  CodeBucket:
+    Type: String
+    Description: Private bucket holding the function zip (created by infra/deploy.sh).
+  CodeKey:
+    Type: String
+    Description: Object key of the function zip (content-addressed by infra/deploy.sh).
+  ApiThrottleRateLimit:
+    Type: Number
+    Default: 3
+    Description: >-
+      Sustained requests/second on POST /api/* (the routes that can reach Bedrock
+      and so spend money). Abuse and cost guard.
+  ApiThrottleBurstLimit:
+    Type: Number
+    Default: 6
+    Description: Short-burst ceiling on POST /api/*.
+  SiteThrottleRateLimit:
+    Type: Number
+    Default: 50
+    Description: >-
+      Sustained requests/second for everything else (static files, /api/health).
+      Higher, because one page view loads several files at once; none of it
+      reaches Bedrock.
+  SiteThrottleBurstLimit:
+    Type: Number
+    Default: 100
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+
+Resources:
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-api
+      RetentionInDays: !Ref LogRetentionDays
+
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: least-privilege-runtime
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Converse is authorised by bedrock:InvokeModel. Scoped to one model,
+              # not bedrock:*, and not Resource "*".
+              - Sid: InvokeOneBedrockModel
+                Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource:
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
+                  - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/${BedrockFoundationModelId}
+              - Sid: WriteOwnLogsOnly
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt ApiLogGroup.Arn
+
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: ChallanCheck web app + Bedrock observation relay (the rule engine runs in the browser)
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      Handler: backend/lambda.handler
+      MemorySize: 512
+      # API Gateway HTTP API cuts integrations off at 30 s; stay under it so the
+      # client gets our coded error instead of a bare gateway 504.
+      Timeout: 28
+      Role: !GetAtt FunctionRole.Arn
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+      LoggingConfig:
+        LogGroup: !Ref ApiLogGroup
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub ${AWS::StackName}
+      ProtocolType: HTTP
+
+  Integration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApiFunction.Arn
+      PayloadFormatVersion: "2.0"
+      TimeoutInMillis: 29000
+
+  # Two routes, one function. POST /api/* can reach Bedrock, so it gets its own,
+  # tight throttle. Everything else (the web app's static files, /api/health)
+  # falls to $default. The function owns routing and 404/405, so the same code
+  # behaves identically locally and deployed.
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "POST /api/{proxy+}"
+      Target: !Sub integrations/${Integration}
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: $default
+      Target: !Sub integrations/${Integration}
+
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    DependsOn: [ApiRoute, DefaultRoute]
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref SiteThrottleRateLimit
+        ThrottlingBurstLimit: !Ref SiteThrottleBurstLimit
+      RouteSettings:
+        "POST /api/{proxy+}":
+          ThrottlingRateLimit: !Ref ApiThrottleRateLimit
+          ThrottlingBurstLimit: !Ref ApiThrottleBurstLimit
+
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*
+
+Outputs:
+  SiteUrl:
+    Description: Public URL of the web app. The API is the same origin under /api.
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  FunctionName:
+    Value: !Ref ApiFunction
+  LogGroupName:
+    Value: !Ref ApiLogGroup

@@ -18,9 +18,15 @@ import http from "node:http";
 import { pathToFileURL } from "node:url";
 import { observeEvidenceViaBedrock, DEFAULT_REGION, DEFAULT_MODEL_ID } from "./src/bedrockAdapter.js";
 import { sniffImageType } from "./src/imageType.js";
+import { redactAwsIdentifiers } from "./src/redact.js";
 
-export const MAX_BODY_BYTES = 8 * 1024 * 1024; // JSON envelope incl. base64 (~33% larger than the image)
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // Claude's per-image limit
+// Sized for the DEPLOYED path, not just this local server: API Gateway HTTP API
+// (10 MB) -> Lambda synchronous request (6 MB = 6,291,556 bytes) -> Bedrock. Base64
+// inflates an image by 4/3, so a 4.6 MB photo is a 6.5 MB request that the live
+// gateway refuses (HTTP 413 {"message":"Request Entity Too Large"}) before any of
+// our code runs. A 3 MB image is a 4 MB request: clear of every layer.
+export const MAX_BODY_BYTES = 5 * 1024 * 1024; // JSON envelope incl. base64 (~33% larger than the image)
+export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
 const AUDIT_PATHS = new Set(["/audit", "/api/audit"]);
 const DEFAULT_ORIGINS = [
@@ -72,12 +78,20 @@ function readBody(req) {
   });
 }
 
-async function parseAuditRequest(req) {
+/**
+ * Pure request validation shared by this server and the Lambda handler
+ * (backend/lambda.js): JSON text in, a validated { imageBase64, mimeType, bytes } out,
+ * or an HttpError. Nothing here touches a stream or AWS.
+ * @param {string} bodyText
+ */
+export function parseAuditPayload(bodyText) {
+  if (typeof bodyText !== "string" || Buffer.byteLength(bodyText) > MAX_BODY_BYTES) {
+    throw new HttpError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
+  }
   let parsed;
   try {
-    parsed = JSON.parse(await readBody(req));
-  } catch (err) {
-    if (err instanceof HttpError) throw err;
+    parsed = JSON.parse(bodyText);
+  } catch {
     throw new HttpError(400, "BAD_REQUEST", "Request body must be valid JSON.");
   }
 
@@ -98,6 +112,23 @@ async function parseAuditRequest(req) {
     throw new HttpError(415, "UNSUPPORTED_IMAGE", "Evidence must be a JPEG, PNG, WebP, or GIF image.");
   }
   return { imageBase64: base64, mimeType, bytes: bytes.length };
+}
+
+async function parseAuditRequest(req) {
+  return parseAuditPayload(await readBody(req));
+}
+
+/**
+ * Maps anything thrown while serving /audit to { status, code, message }.
+ * Never includes an observation. Upstream AWS text can carry ARNs and account ids
+ * (an AccessDenied message names the caller), so those are redacted: this API is
+ * public once deployed.
+ */
+export function describeError(err) {
+  if (err instanceof HttpError) return { status: err.status, code: err.code, message: err.message };
+  if (err?.code === "AWS_NOT_CONFIGURED") return { status: 503, code: err.code, message: redactAwsIdentifiers(err.message) };
+  if (err?.code === "AWS_ERROR") return { status: 502, code: err.code, message: redactAwsIdentifiers(err.message) };
+  return { status: 500, code: "INTERNAL", message: "Unexpected server error." };
 }
 
 /**
@@ -146,16 +177,7 @@ export function createAuditServer({
           `bedrockMs=${result.meta?.latencyMs} totalMs=${Date.now() - startedAt} type=${mimeType} bytes=${bytes}`
       );
     } catch (err) {
-      let status = 500;
-      let code = "INTERNAL";
-      let message = "Unexpected server error.";
-      if (err instanceof HttpError) {
-        ({ status, code, message } = err);
-      } else if (err?.code === "AWS_NOT_CONFIGURED") {
-        [status, code, message] = [503, err.code, err.message];
-      } else if (err?.code === "AWS_ERROR") {
-        [status, code, message] = [502, err.code, err.message];
-      }
+      const { status, code, message } = describeError(err);
       // Never an `observation` on failure: no silent fixture/mock fallback.
       send(res, status, { error: { code, message } }, cors);
       log(`[audit] ${status} ${code} totalMs=${Date.now() - startedAt} :: ${err?.message ?? err}`);
