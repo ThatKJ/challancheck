@@ -123,3 +123,55 @@ The UI limit and copy are 5 MB (`0f5f639`), and the server trusts the image byte
 type (`backend/src/imageType.js`). `tests/unit/uploadContract.test.js` now pins the frontend limit
 and copy to the backend's exported constants, checks that base64 inflation fits the body cap, and checks
 the client's accepted types are a subset of the server's.
+
+FOLLOW-UP, on the deployed path (2026-09-19) — the contract was still one layer short:
+`uploadContract.test.js` passed, yet the platform between the two ends has its own limit. API Gateway
+and Lambda accept at most 6 MB (6,291,556 bytes) for a synchronous request, and base64 inflates an image by
+4/3. We measured it against the live gateway instead of trusting the arithmetic: a 4.63 MB image, which the
+5 MB UI accepted, became a 6,466,890-byte request, and the gateway answered HTTP 413
+`{"message":"Request Entity Too Large"}`. That is the platform's own shape, not our
+`{"error":{"code","message"}}`, and it arrived before any of our code ran. The limit is now 3 MB per image
+(a ~4 MB request) with a 5 MB body cap in both the UI and the server, still pinned by the same test. The
+lesson widened: the contract includes the platform in the middle, and only the deployed platform can show it.
+
+### Learning 6 — Reconstruct AWS state from AWS before acting on it
+
+INITIAL ASSUMPTION:
+Nothing was deployed. The docs said so, and the one deploy command we had run was reported as rejected.
+
+WHAT WENT WRONG / WHAT WE DISCOVERED:
+An IAM listing for an unrelated identity check showed a role named `challancheck-api-FunctionRole-…`.
+A CloudFormation stack `challancheck-api` had been created on 2026-09-19 at 12:31 UTC from an earlier template
+on an unmerged branch (API only, a Nova model, CORS `*`), and its public API was answering. We did not determine who
+ran it. The public `main` did not contain the code it was running, so the deployment could not be reproduced from
+the repository.
+
+WHAT WE LEARNED:
+Read AWS's own state (stacks, roles, functions) before deciding what to build, and never let "the command was
+rejected" stand in for "nothing happened". A deployment that the public repository cannot recreate is not one to submit.
+
+WHAT WE CHANGED:
+We probed the old stack read-only, then built the deployment path from `main` (a thin Lambda around the existing
+server logic plus the static app) and previewed the update as a CloudFormation change set: 5 modify, 1 add,
+0 replace, 0 remove. We executed exactly that change set, so the URL did not change, and recorded the history in
+`docs/CANONICAL_RUN.md` section 2b. `infra/deploy.sh` gained `PREVIEW=1` for this.
+
+### Learning 7 — One origin removed the hosting question
+
+INITIAL ASSUMPTION:
+A public URL for the web app means a second hosting service (S3 with CloudFront, or Amplify) and CORS between it
+and the API.
+
+WHAT WE DISCOVERED:
+The built app is five small files that load nothing from other origins. Whether CloudFront or Amplify could be
+created on this restricted account was unknown, and could not be found out without trying to create them.
+
+WHAT WE LEARNED:
+When the assets are that small, serving them from the function that already exists is the smaller architecture:
+fewer services, no CORS, and no dependency on an approval we could not check. It has a real cost (no CDN, and each
+file request is a Lambda invocation), which is acceptable at this scale and reversible.
+
+WHAT WE CHANGED:
+One Lambda serves the static app and the API, with the API only under `/api/*`, which is also the only route
+that can reach Bedrock and so the only one throttled tightly (3 req/s, burst 6). In a real browser against the
+public URL the app loaded under a strict Content-Security-Policy with 0 violations and 0 JS errors.
