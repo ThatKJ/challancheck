@@ -47,6 +47,11 @@ or what the user should do.
   (`docs/QA_REPORT.md`); build and lint pass.
 - **Failure honesty.** The local backend relay returns a coded error and no observation when Bedrock
   refuses a call; tests pin that at the server, the adapter and the frontend client.
+- **AWS deployment.** The web app and API are deployed at https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
+  (API Gateway → one Lambda, `ap-south-1`) and were verified with curl and in a real browser: `GET /health` → 200,
+  and `POST /audit` reaches the Lambda and Bedrock, which refuses it, so the API returns a coded HTTP 502 `AWS_ERROR`
+  with no observation and no fixture fallback. The deployed code is byte-identical to commit `110e283` on `main`
+  (`docs/CANONICAL_RUN.md` section 2b).
 
 ### What is blocked
 
@@ -86,8 +91,9 @@ React/Vite app ──┬─ "Explore an example" → fixture adapter (canned obs
 
 ```
 browser ──► API Gateway (HTTP API) ──► one Lambda ──► Amazon Bedrock
-              POST /api/* throttled      · serves the built web app (static files)
-                                         · GET /api/health, POST /api/audit (image → observation relay)
+              POST /audit and            · serves the built web app (static files)
+              POST /api/* throttled      · GET /health, POST /audit (image → observation relay);
+                                           also served as /api/health and /api/audit
 ```
 
 Public URL: https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
@@ -107,13 +113,14 @@ there is no always-on server; API Gateway and Lambda bill per request and nothin
 the primary variable AI cost** (billed by tokens; unmeasured here because no call has succeeded); no database is
 used because the core flow persists nothing; and nothing runs idle.
 
-**Ship It readiness: PARTIALLY DEPLOYED, NOT READY.** A public URL, API Gateway and Lambda exist and were verified in a
-real browser. The product's real path (Bedrock analysis of the evidence) has not worked once, so a deployed
-end-to-end run does not exist.
+**Ship It readiness: PARTIALLY READY.** AWS-hosted frontend and API: **yes**, verified in a real browser and with curl.
+Bedrock integration: implemented. Live Bedrock inference: **blocked** by the AWS account (a refusal, not a code fault), so
+a deployed end-to-end analysis run does not exist and full Bedrock Ship It success is not claimed. Fixture demo path:
+proven locally and on the public site, labelled as a fixture. Silent fallback to fixtures on the live path: none.
 
 ## What we learned
 
-Six real events, each traceable in this repository (`docs/LEARNING.md`):
+Seven real events, each traceable in this repository (`docs/LEARNING.md`):
 
 1. **Let the model observe, and let the evaluator refuse.** A rule engine with no confidence gate turned a 60%-confidence "car" into a confident inconsistency; the observation now carries its doubt.
 2. **A false positive is worse than a miss.** Our own OCR-tolerance fix fabricated two claims that red-team traps caught.
@@ -121,6 +128,7 @@ Six real events, each traceable in this repository (`docs/LEARNING.md`):
 4. **Region, model and account access are architecture.** Inference-profile-only models and a zero applied quota cost us hours we spent waiting for "propagation".
 5. **Contracts must be tested across the boundary.** A 10 MB UI limit against a 5 MB server limit was invisible to each side's own tests.
 6. **Platform limits are part of the contract, and only the live platform shows them.** A 4.63 MB photo, which the UI accepted, became a 6.47 MB request that the deployed gateway refused with a bare 413 above Lambda's 6 MB limit before any of our code ran. The limit is now 3 MB, pinned by a test.
+7. **Run the stated contract literally against the live URL.** The previously deployed version answered `GET /health` with HTTP 200 `text/html` (unknown paths fell through to the single-page app, which looks healthy and is not) and `POST /audit` with a plain-text 405; only the `/api/*` forms worked. Both now return coded JSON, and the throttle that guards Bedrock covers every path that can reach it, pinned by tests (commit `110e283`, `docs/LEARNING.md` Learning 8).
 
 ## AI disclosure
 

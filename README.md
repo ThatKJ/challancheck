@@ -7,7 +7,7 @@
 **Submission mode: B — AWS not verified.** The observations shown in the demo come from a local fixture
 adapter, not from Amazon Bedrock. See [Current AWS status](#current-aws-status).
 
-**Deployed on AWS:** https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com (API Gateway → one Lambda, `ap-south-1`). The hosting and API are live and verified in a browser; **live Bedrock analysis from it is unavailable** because the AWS account refuses the call, so the live path returns a coded error and never fixture data. Its demo mode is the same labelled fixture demo.
+**Deployed on AWS:** https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com (API Gateway → one Lambda that serves both the web app and the API, `ap-south-1`, code = commit `110e283`). The hosting and API are live and were verified in a browser and with curl on 2026-09-19 (`GET /health` → 200; `POST /audit` → coded `AWS_ERROR`, HTTP 502). **Live Bedrock analysis from it is unavailable** because the AWS account refuses the call, so the live path returns a coded error and never fixture data. Its demo mode is the same labelled fixture demo.
 
 ## Who it helps
 
@@ -65,17 +65,17 @@ SOURCE EVIDENCE → VISUAL OBSERVATION → STRUCTURED FACTS → DETERMINISTIC EV
 
 ## Current AWS status
 
-**Mode B — AWS not verified.** Checked 2026-09-19; full command record in [`docs/CANONICAL_RUN.md`](docs/CANONICAL_RUN.md).
+**Mode B — AWS not verified.** Checked 2026-09-19 and re-checked at the final deployment verification (about 19:50 UTC); full command record in [`docs/CANONICAL_RUN.md`](docs/CANONICAL_RUN.md).
 
 | Check | Result |
 |---|---|
 | AWS identity and region (`ap-south-1`) | resolves |
 | Inference profile `global.anthropic.claude-sonnet-5` | ACTIVE in the region |
-| Live text call to Bedrock | **FAIL**: `ValidationException: Operation not allowed`, in 445 ms |
+| Live text call to Bedrock | **FAIL**: `ValidationException: Operation not allowed`, in 445 ms (480 ms when re-run at the final verification) |
 | Live image call (real PNG → local server → Bedrock) | **FAIL**: same error; HTTP 502 `AWS_ERROR`, no observation returned |
 | Applied quota, "Global cross-region model inference tokens per minute for Anthropic Claude Sonnet 5" | `0` (AWS default: `6,000,000`) |
 | Model authorization for this account | `NOT_AUTHORIZED` |
-| Deployed to AWS | **yes: the hosting/API shell** (API Gateway + Lambda, `ap-south-1`). A live image call through it is refused the same way: HTTP 502 `AWS_ERROR`, no observation. Record: [`docs/CANONICAL_RUN.md`](docs/CANONICAL_RUN.md) section 2b |
+| Deployed to AWS | **yes: the hosting/API shell** (API Gateway + Lambda, `ap-south-1`). `GET /health` → HTTP 200. A live image call to `POST /audit` (or `POST /api/audit`) is refused the same way: HTTP 502 `AWS_ERROR`, no observation. Record: [`docs/CANONICAL_RUN.md`](docs/CANONICAL_RUN.md) section 2b |
 
 We believe an account-level limit is the cause; we have not been able to lift it. **Not verified:** any successful
 Bedrock inference, a schema-valid live observation, latency, accuracy or repeatability.
@@ -98,8 +98,9 @@ React/Vite app ──┬─ "Explore an example" → fixture adapter (canned obs
 
 ```
 browser ──► API Gateway (HTTP API) ──► one Lambda ──► Amazon Bedrock
-              POST /api/* throttled      · serves the built web app (static files)
-                                         · GET /api/health, POST /api/audit (image → observation relay)
+              POST /audit and            · serves the built web app (static files)
+              POST /api/* throttled      · GET /health, POST /audit (image → observation relay);
+                                           also served as /api/health and /api/audit
 ```
 
 Public URL: https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
@@ -119,15 +120,16 @@ there is no always-on server; API Gateway and Lambda bill per request and nothin
 the primary variable AI cost** (billed by tokens; unmeasured here because no call has succeeded); no database is
 used because the core flow persists nothing; and nothing runs idle.
 
-**Ship It readiness: PARTIALLY DEPLOYED, NOT READY.** A public URL, API Gateway and Lambda exist and were verified in a
-real browser. The product's real path (Bedrock analysis of the evidence) has not worked once, so a deployed
-end-to-end run does not exist.
+**Ship It readiness: PARTIALLY READY.** AWS-hosted frontend and API: **yes**, verified in a real browser and with curl.
+Bedrock integration: implemented. Live Bedrock inference: **blocked** by the AWS account (a refusal, not a code fault), so
+a deployed end-to-end analysis run does not exist and full Bedrock Ship It success is not claimed. Fixture demo path:
+proven locally and on the public site, labelled as a fixture. Silent fallback to fixtures on the live path: none.
 
 ## Demo / run locally
 
 ```
 npm install
-npm test                                # 13 files, 150 tests; no AWS account needed
+npm test                                # 13 files, 155 tests; no AWS account needed
 npm install --prefix frontend
 npm run dev --prefix frontend           # open the printed URL and choose "Explore an example"
 ```

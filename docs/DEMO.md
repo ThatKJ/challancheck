@@ -12,11 +12,14 @@ The demo has exactly two product cases and four beats:
 - `npm install && npm install --prefix frontend`, then `npm run dev --prefix frontend` (use the port it prints).
 - Stay on **Explore an example**. Do not attach a photo: the fixture observations are not derived from any
   image, and a car photo on screen would read as "it analysed this". (If you do attach one, say it is display-only.)
-- Have two things ready to show: a terminal, and `docs/CANONICAL_RUN.md` section 2.
+- Have three things ready to show: a terminal, `docs/CANONICAL_RUN.md` section 2b, and the public URL
+  (https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com) in a second tab for the AWS beat: on **Upload evidence**,
+  type a claim, attach any photo and press Review evidence. The photo is sent to the API and refused by Bedrock;
+  nothing analyses it. Use a synthetic or your own photo, not someone else's challan, because the API is public.
 - Re-run `npm run check:bedrock-text` once beforehand. If it now **passes**, stop: this script is out of date;
   follow `docs/CANONICAL_RUN.md` section 3 and the Mode A delta.
 
-## MODE B script (target 2:50)
+## MODE B script (target 2:55)
 
 **0:00–0:18 — User and problem** · *Screen: first screen, "A claim is only half the picture."*
 > "An e-Challan cites a violation and attaches a photo as evidence. If the photo doesn't seem to show that
@@ -37,25 +40,26 @@ The demo has exactly two product cases and four beats:
 > "Now an ambiguous case: poor image quality, severe occlusion, helmet uncertain at 30% confidence. The same rules
 > refuse to overclaim. 'We won't guess.' Saying 'I can't tell' is a first-class result, not an error."
 
-**1:45–2:20 — AWS and architecture** · *Screen: README "Trust boundary" diagram → terminal: `npm run check:bedrock-text` → `docs/CANONICAL_RUN.md` section 2.*
+**1:45–2:25 — AWS and architecture** · *Screen: README "Trust boundary" diagram → the public URL: Upload evidence → Review evidence → the error banner → terminal: `npm run check:bedrock-text` → `docs/CANONICAL_RUN.md` section 2b.*
 > "Amazon Bedrock is designed to be the observer only: it gets the image, never the challan text, and its reply must
-> pass our schema. But live Bedrock is unverified. This is a real call from our account — 'Operation not allowed',
-> in about half a second — and the applied quota for this model is zero, against an AWS default of six million.
-> When that happens the app returns a coded error, never fixture data. The engine and schema are real and tested;
-> the Bedrock integration is written but has not run successfully."
+> pass our schema. Our app and API are deployed on AWS, in Mumbai. Upload a photo and the Lambda calls Bedrock, and
+> our account refuses it — 'Operation not allowed', in about half a second — so the app shows that error and never
+> fixture data. The applied quota for this model is zero, against an AWS default of six million. The engine and
+> schema are real and tested; the Bedrock integration is written but has not run successfully."
 
-**2:20–2:42 — Learning** · *Screen: `docs/LEARNING.md`.*
+**2:25–2:47 — Learning** · *Screen: `docs/LEARNING.md`.*
 > "Two lessons. Observe-only isn't enough: our first rule engine turned a 60%-confidence 'car' into a confident
 > mismatch until an adversarial test caught it, so observations now carry their own doubt. And model access is
 > architecture: we waited hours for a 'propagation delay' when the quota view showed a flat zero."
 
-**2:42–2:50 — Close**
+**2:47–2:55 — Close**
 > "ChallanCheck makes the comparison explicit and reviewable, and says 'I can't tell' when it can't."
 
 ## Never say or show in Mode B
 
 "Bedrock analysed / powers / extracted…", "real Bedrock observations", "upload your challan and we…", any latency or
-accuracy figure, "deployed" or a URL, "grievance packet", or a fixture result described as live.
+accuracy figure, "deployed" without saying the live path is refused by Bedrock (never "the deployed app analyses…"),
+"grievance packet", or a fixture result described as live.
 
 ## Claim ledger — every spoken statement, classified
 
@@ -75,11 +79,13 @@ accuracy figure, "deployed" or a URL, "grievance packet", or a fixture result de
 | 12 | Bedrock is designed as observer only: it gets the image, never the challan text, and its reply must pass our schema | VERIFIED as design (code, not a live run) | `backend/src/bedrockAdapter.js` (prompt and request body; `validateObservation`) |
 | 13 | A real call from our account fails "Operation not allowed" in about half a second | VERIFIED if the terminal is shown live; otherwise from the record (445 and 472 ms) | `npm run check:bedrock-text`; section 2 |
 | 14 | Applied quota zero vs AWS default six million | CONDITIONAL: re-run the `service-quotas` commands in section 2 before recording | `docs/CANONICAL_RUN.md` |
-| 15 | When Bedrock refuses, the app returns a coded error, never fixture data | VERIFIED | `tests/unit/server.test.js`, `tests/unit/liveFailureContract.test.js`; section 2 |
+| 15 | When Bedrock refuses, the app returns a coded error, never fixture data | VERIFIED | `tests/unit/server.test.js`, `tests/unit/lambda.test.js`, `tests/unit/liveFailureContract.test.js`; sections 2 and 2b |
 | 16 | Engine and schema are real and tested | VERIFIED | `npm test` |
 | 17 | First engine turned a 60% "car" into a confident mismatch | VERIFIED | `docs/TASK_BOARD.md` P0-04; case ADV-09 |
 | 18 | We waited hours for "propagation"; the quota was zero | VERIFIED | `docs/AGENT_LOG.md` 2026-09-19 01:05; section 2 |
-| — | Any Bedrock-analysed, latency, accuracy, deployed, or grievance-packet claim | REMOVED | not in the script |
+| 19 | Our app and API are deployed on AWS (API Gateway + Lambda, Mumbai) | VERIFIED | `docs/CANONICAL_RUN.md` section 2b (curl and real browser, 2026-09-19); the public URL |
+| 20 | On the deployed app, uploading a photo makes the Lambda call Bedrock, our account refuses it, and the app shows that error and no result | VERIFIED if shown live; otherwise from the record | section 2b; `tests/unit/lambda.test.js` |
+| — | Any Bedrock-analysed, latency, accuracy, or grievance-packet claim, or that the deployed app analyses images | REMOVED | not in the script |
 
 ## MODE A delta (only after `docs/CANONICAL_RUN.md` section 3 is complete)
 

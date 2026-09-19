@@ -172,6 +172,29 @@ fewer services, no CORS, and no dependency on an approval we could not check. It
 file request is a Lambda invocation), which is acceptable at this scale and reversible.
 
 WHAT WE CHANGED:
-One Lambda serves the static app and the API, with the API only under `/api/*`, which is also the only route
-that can reach Bedrock and so the only one throttled tightly (3 req/s, burst 6). In a real browser against the
-public URL the app loaded under a strict Content-Security-Policy with 0 violations and 0 JS errors.
+One Lambda serves the static app and the API. The routes that can reach Bedrock (`POST /api/*` and, since
+Learning 8, `POST /audit`) each get their own tight throttle (3 req/s, burst 6); everything else falls to a looser
+static-file throttle that can never reach Bedrock. In a real browser against the public URL the app loaded under a
+strict Content-Security-Policy with 0 violations and 0 JS errors.
+
+### Learning 8 — Run the stated contract literally against the live URL
+
+INITIAL ASSUMPTION:
+The deployed API matched its contract, because the tests passed and the paths our own web app used (`/api/health`,
+`/api/audit`) worked.
+
+WHAT WE DISCOVERED:
+The contract is `GET /health` and `POST /audit`: the local server's paths, and what the frontend's
+`${VITE_API_BASE_URL}/audit` assumes. Run literally against the deployed URL, `GET /health` returned HTTP 200 with
+`text/html` (an unknown, extensionless path falls through to the single-page app, so a check that looked healthy was
+serving the app's HTML) and `POST /audit` returned a plain-text 405. Only the `/api/*` forms worked.
+
+WHAT WE LEARNED:
+A 200 is not a health check: look at the content type and the body, and run the contract as written rather than the
+variant your own client happens to use. A single-page-app fallback can silently answer for a route that does not exist.
+
+WHAT WE CHANGED:
+The function now matches `/health` and `/audit` (as well as the `/api/*` forms) before the static handler, and a `GET`
+on `/audit` is a coded JSON 405, never HTML. `POST /audit` became its own API Gateway route with the same tight throttle
+as `POST /api/*`, so the looser static-file throttle can never reach Bedrock; a test reads `infra/template.yaml` and
+`backend/lambda.js` and fails if any Bedrock-reaching path lacks its own throttled route (commit `110e283`).
