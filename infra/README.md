@@ -6,10 +6,10 @@ describes the design and the command, not the current state.
 
 ```
 browser ──► API Gateway (HTTP API) ──► ONE Lambda (Node.js 22, arm64) ──► Amazon Bedrock
-              POST /api/*  throttled tight     backend/lambda.js
-              everything else  looser          GET /, /assets/*  the built web app (static)
-                                               GET /api/health   liveness, no AWS call
-                                               POST /api/audit   image -> Bedrock observation
+              POST /audit, POST /api/*         backend/lambda.js
+                each throttled tight           GET /, /assets/*  the built web app (static)
+              everything else  looser          GET /health       liveness, no AWS call (also /api/health)
+                                               POST /audit       image -> Bedrock observation (also /api/audit)
 ```
 
 The deterministic rule engine runs **in the browser** (as it does locally): the
@@ -30,7 +30,8 @@ standard provider chain (`aws login`, `AWS_PROFILE`, SSO); nothing credential-sh
 read, written or printed. The script builds the web app with `VITE_API_BASE_URL=/api`,
 bundles it with the function, **scans the bundle for secret-shaped content and aborts if
 any is found**, uploads the zip to a private S3 bucket, deploys `template.yaml`, then
-smoke-tests `/`, `/api/health`, and that an un-prefixed API path is refused.
+smoke-tests `/`, `GET /health` and `GET /api/health` (which must answer JSON, not the app's HTML),
+`GET /audit` (a coded JSON 405; no Bedrock call), and that an unknown POST path is refused. It never POSTs an image.
 Remove everything with `aws cloudformation delete-stack --stack-name challancheck-api`
 (plus the artifact bucket `challancheck-artifacts-<account>-<region>`).
 
@@ -71,17 +72,18 @@ ECS, EKS. Nothing in the core flow needs to persist or queue anything.
   `bedrock:InvokeModel` on the one inference profile and its foundation model, and
   writing to its own log group. Not `bedrock:*`, not `Resource: "*"`, not
   AdministratorAccess. Lambda environment variables hold configuration only.
-- **Bedrock is reachable only through `POST /api/*`**, the route with the tight throttle
-  (default 3 requests/second sustained, burst 6). The handler does not route
-  un-prefixed API paths to it (unit-tested), so the looser static-file throttle (50/100)
-  can never be used to reach Bedrock.
+- **Bedrock is reachable only through `POST /audit` and `POST /api/*`**, two routes that each
+  have their own tight throttle (default 3 requests/second sustained, burst 6, per route).
+  The handler routes no other path to it, and a test reads `infra/template.yaml` and
+  `backend/lambda.js` and fails if a Bedrock-reaching path lacks its own throttled route, so
+  the looser static-file throttle (50/100) can never be used to reach Bedrock.
 - **Web app hardening:** strict CSP (`default-src 'self'`, `frame-ancestors 'none'`,
   `connect-src 'self'`, no `unsafe-eval`, no inline script), `nosniff`, `no-referrer`,
   `X-Frame-Options: DENY`. Path traversal on the static handler is covered by tests. No
   CORS is configured because nothing cross-origin is needed.
 - **No account details in responses:** error text from AWS is passed through a
   redactor (ARNs, 12-digit account ids, key ids) because an AccessDenied message can
-  name the caller. `/api/health` returns only status, region and model id.
+  name the caller. `/health` (and `/api/health`) return only status, service name, mode, region and model id.
 - **Abuse and cost.** The API is public and unauthenticated. A key shipped in a browser
   bundle is not a secret, so none is pretended. Anyone with the URL can still cause
   Bedrock spend up to the throttle; the Free plan's credits bound the exposure, and

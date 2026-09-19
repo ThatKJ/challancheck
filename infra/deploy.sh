@@ -98,8 +98,19 @@ echo "== deployed =="
 echo "SiteUrl: ${SITE_URL}   (API: ${SITE_URL}/api)"
 echo "== smoke: web app (expects 200 text/html) =="
 curl -sS --max-time 20 -o /dev/null -w "GET /            -> HTTP %{http_code} %{content_type}\n" "${SITE_URL}/"
-echo "== smoke: GET /api/health (no AWS call) =="
-curl -sS --max-time 20 "${SITE_URL}/api/health"
+echo "== smoke: GET /health and /api/health (expect 200 application/json; no AWS call) =="
+# A bare 200 proves nothing: an unknown path falls through to the single-page app, which
+# also answers 200 (text/html). Health must be JSON, at the root and under /api.
+for p in /health /api/health; do
+  got="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{content_type}' "${SITE_URL}${p}")"
+  echo "GET ${p} -> ${got}"
+  case "${got}" in "200 application/json"*) ;; *) echo "FAIL: GET ${p} must be 200 application/json" >&2; exit 1 ;; esac
+done
+curl -sS --max-time 20 "${SITE_URL}/health"
 echo
-echo "== smoke: un-prefixed API path must NOT reach the API =="
+echo "== smoke: GET /audit is a coded JSON 405, never HTML (no Bedrock call) =="
+got="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{content_type}' "${SITE_URL}/audit")"
+echo "GET /audit -> ${got}"
+case "${got}" in "405 application/json"*) ;; *) echo "FAIL: GET /audit must be 405 application/json" >&2; exit 1 ;; esac
+echo "== smoke: an unknown POST path is refused =="
 curl -sS --max-time 20 -o /dev/null -w "POST /report      -> HTTP %{http_code} (expect 405)\n" -X POST "${SITE_URL}/report"
