@@ -192,7 +192,7 @@ Expected: Scanner exits 0 on a clean tree so the gate is trustworthy.
 Actual: Scanner exited 1 on the clean tree — three self-false-positives, zero real leaks: (a) filename check matched the scanner's own filename (`secret_scan.sh` contains "secret"); (b) content check matched the scanner's own `for pat in 'aws_secret_access_key'...` definition lines plus QA/AGENT_LOG prose quoting the patterns; (c) history `-S` check fired on the commits that introduced the scanner literals themselves. Independently verified NO real leak: no `AKIA[0-9A-Z]{16}` value outside pattern literals, no `aws_secret_access_key =` assignment, no private-key block, no `.env` tracked, `~/.aws` outside repo, AWS SDK absent from frontend src and dist bundle (dist "bedrock" hit is only the UI label string "Source: Amazon Bedrock").
 Reproduction (pre-fix): `sh scripts/verification/secret_scan.sh` → `SCANNER_EXIT:1` with `LEAK: sensitive filename tracked`, `LEAK: pattern aws_secret_access_key`, `LEAK in history` lines.
 Recommended smallest fix: harden the scanner (REDTEAM-owned, safe to touch) — self-exclude own filename, match `aws_secret_access_key` assignment-shaped only (`key\s*[:=]\s*<20+ base64 chars>`, so prose/`= ...` never trips), history scan on added-diff value-shaped lines excluding bracket-form regex literals.
-Status: FIXED 2026-09-19 by auditor in `scripts/verification/secret_scan.sh` (uncommitted — see handoff). Verified: exit 0 on clean tree; negative controls all correct — planted AKIA-shaped value → exit 1, planted key assignment → exit 1, planted prose (`aws_secret_access_key = ...`) → exit 0 (plant files removed after).
+Status: FIXED 2026-09-19 by auditor in `scripts/verification/secret_scan.sh` (committed in `48e92be`). Verified: exit 0 on clean tree; negative controls all correct — planted AKIA-shaped value → exit 1, planted key assignment → exit 1, planted prose (`aws_secret_access_key = ...`) → exit 0 (plant files removed after).
 
 ## ID: RED-016
 Severity: P1
@@ -202,7 +202,7 @@ Actual: Mismatch. Frontend accepts up to 10 MB and its copy says "up to 10 MB" (
 Reproduction: static — read App.jsx:53 vs server.js:22-23; arithmetic: 10 MB × 4/3 ≈ 13.3 MB > 8 MB; 5 MB < image ≤ 10 MB passes client, fails server.
 Evidence: same lines.
 Recommended smallest fix (BUILD-owned — auditor did NOT touch): align frontend limit + copy to the backend truth (5 MB image, i.e. reject >5 MB client-side with "up to 5 MB" copy), OR raise backend `MAX_BODY_BYTES`/`MAX_IMAGE_BYTES` to cover 10 MB (then re-check Bedrock's own per-image limit). Either is a 2-line change + copy. P2 sub-note in the same contract: frontend `accept` omits `image/gif` while backend `sniffImageType` accepts GIF — safe direction (backend superset), align the accept lists while touching this.
-Status: OPEN
+Status: CLOSED 2026-09-19 (final release audit) — the UI limit and copy are 5 MB (`frontend/src/App.jsx:69,282`, changed in `0f5f639`), equal to `MAX_IMAGE_BYTES`. Now pinned across the boundary by `tests/unit/uploadContract.test.js` (UI limit === `MAX_IMAGE_BYTES`; a max-size image fits `MAX_BODY_BYTES` once base64-encoded; every type in the UI `accept` list is a type the server accepts). The UI `accept` still omits GIF (safe direction).
 
 ## ID: RED-017
 Severity: P1
@@ -212,7 +212,7 @@ Actual: Residual RED-003 gap the closure evidence missed (it cited README:10/:39
 Reproduction: `sh scripts/verification/claims_audit.sh` (after auditor's `-i` fix) flags README.md:29; read README.md:29-30.
 Evidence: same lines; SUBMISSION.md:9 Mode-A hits are explicitly conditional ("Use this ONLY if…") — not a finding; AGENT_LOG hits are historical prose — not a finding.
 Recommended smallest fix (LEAD/BUILD-owned — auditor did NOT touch product docs): re-tense the two bullets to designed-to/conditional ("is designed to perform…", gate on Mode A exactly like SUBMISSION.md does). Tooling half already done: auditor added `-i` to the present-tense grep in `scripts/verification/claims_audit.sh`.
-Status: OPEN
+Status: CLOSED 2026-09-19 (final release audit) — README rewritten in Mode B language ("designed to…", "live AWS mode unverified"); `claims_audit.sh` no longer flags README's AWS statements; the remaining Mode-A-conditional and historical hits were reviewed.
 
 ## Resweep verified-clean (no finding filed)
 
@@ -225,3 +225,54 @@ Status: OPEN
 - Secrets: see RED-015 (no real leak found by any check).
 - Deployment: P1-06 CUT is intentional and consistently documented (handoff + TASK_BOARD); `server.js` binds loopback with `PORT`/`ALLOWED_ORIGINS` overrides — nothing to fix for a local-demo plan.
 - P2 note (not action-required, recorded for completeness): `frontend/README.md` is still the stock Vite template ("This template provides a minimal setup…") — stale but not judge-facing; root README is the submission surface. Fix only if touching frontend docs anyway.
+
+---
+
+# FINAL RELEASE AUDIT 2026-09-19 — release owner (Claude Code)
+
+Scope: P0/P1 only. Baseline before any change: `main` @ `56ceb52`, clean; `npm test` 9 files / 89 tests; frontend build, oxlint and `secret_scan.sh` pass; no `test:e2e` script exists on `main`. Live AWS re-attempted by execution: still refused (`docs/CANONICAL_RUN.md` section 2). Mode B stands.
+
+## ID: RELEASE-001
+Severity: P0
+Claim/Component: README AWS claims
+Actual: "AI Tools Used" said "Amazon Bedrock (Live AWS Mode) used for multimodal image observation" — false (no call has ever succeeded). The setup section said the spike was "blocked pending AWS credentials" (credentials exist; the account is gated). "preparing a structured grievance packet" and "Export/use the evidence summary" described features that are not built.
+Status: CLOSED — README rewritten in Mode B language; each AWS statement traces to `docs/CANONICAL_RUN.md` section 2.
+
+## ID: RELEASE-002
+Severity: P0
+Claim/Component: `docs/DEMO.md`
+Actual: "SHOW REAL BEDROCK OBSERVATIONS" and "Upload blurry evidence -> refuses to guess". In Mode B an uploaded image is not analysed; observations come from a fixture scenario. The script contradicted the running app.
+Status: CLOSED — Mode B script with a per-statement claim ledger; Mode A is a delta gated on `docs/CANONICAL_RUN.md` section 3.
+
+## ID: RELEASE-003
+Severity: P0
+Claim/Component: `docs/SUBMISSION.md`, `docs/LEARNING.md`
+Actual: both said the model "would guess guilt or innocence based on low-confidence artifacts". No model run in this project ever produced that (Bedrock has never responded), and the observe-only boundary is already in the first ChallanCheck commit's `DECISION.md`. SUBMISSION Mode B also named the blocker "credit card verification delays", which the evidence does not support.
+Status: CLOSED — five learning stories each tied to a repository event, with a provenance note; exact blocker recorded.
+
+## ID: RELEASE-004
+Severity: P1
+Claim/Component: `frontend/src/lib/audit.js` error handling
+Actual: every non-2xx answer from `/audit` was re-labelled `AWS_NOT_CONFIGURED` with a generic message, so a 502 `AWS_ERROR` (configured account, Bedrock refused the call) would have been shown as "not configured".
+Reproduction: `tests/unit/liveFailureContract.test.js` — 3 cases red before the fix.
+Status: CLOSED — `0450423`; suite 89 → 101.
+
+## ID: RELEASE-005
+Severity: P1
+Claim/Component: stale/misleading status text
+Actual: `TASK_BOARD.md` P0-01 said "AWS-side propagation delay"; RED-016/RED-017 were OPEN although fixed; `CANONICAL_RUN.md` reported "Total Request Latency: 28ms" for a fixture path that has no request; `DECISION.md` described the grievance packet and PDF/OCR input in present tense.
+Status: CLOSED — corrected with evidence pointers; `DECISION.md` annotated "not built".
+
+## Verified clean (no change made)
+
+- LIVE REQUEST + BEDROCK FAILURE → coded error, never fixture success: observed end to end (real PNG → local server → HTTP 502 `AWS_ERROR`, no `observation`); `tests/unit/server.test.js` and `liveFailureContract.test.js`; `backend/server.js` and `backend/src/bedrockAdapter.js` are statically guarded against referencing the fixture adapter.
+- Upload contract aligned at 5 MB (RED-016 closed above).
+- Result language: internal enums are unchanged; "No Mismatch Found" is an intentional presentation of `CONSISTENT_WITH_EVIDENCE`; no "proves", "invalid", "grounds" or "guilty" in product paths ("verdict" appears only to disclaim it).
+- Secrets: `secret_scan.sh` exit 0; no `.env`, keys or logs tracked; the only tracked raster image is the unused Vite template `frontend/src/assets/hero.png`.
+
+## Deferred (P2/P3, not done)
+
+- `backend/textTest.js` is a stray script that hard-codes a bare model ID; nothing references it.
+- `frontend/README.md` is still the stock Vite template.
+- The UI's "Live AWS / Bedrock status: UNKNOWN" line is accurate from the app's point of view but less specific than the record in `CANONICAL_RUN.md`.
+- `RULES_SNAPSHOT.md` lists teammates' names and the team code in a public repository.

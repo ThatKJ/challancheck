@@ -1,5 +1,11 @@
 # Claude 6 PM Handoff
 
+> **Superseded status (2026-09-19, final release audit).** The body below is the earlier handoff and is kept as a
+> record. It is stale on these points: the auditor's files are committed (`48e92be`, not "uncommitted"); RED-016
+> (5 MB upload limit) and RED-017 (README tense) are closed; the blocker is not an "account verification delay"
+> (`docs/CANONICAL_RUN.md` section 2); tests are now 11 files / 101 tests. Current state: `docs/QA_REPORT.md`
+> "FINAL RELEASE AUDIT". Submission mode remains B.
+
 Auditor resweep completed 2026-09-19 ~15:25 UTC window (Claude offline). Prior handoff content below was verified line-by-line against the repo and updated — do not trust the pre-sweep version.
 
 ## CURRENT STATE
