@@ -11,6 +11,11 @@ The system does NOT determine guilt, innocence, legal validity, or legal advice.
 
 ## Architecture Contract
 
+> Status (2026-09-19): this is the design contract. The "Amazon Bedrock multimodal observation" step has never
+> completed successfully (`docs/CANONICAL_RUN.md` section 2); the demonstrated path uses the fixture adapter for
+> that step, tagged `meta.source = "fixture"`. The two "Violation extraction" and "Evidence image extraction"
+> steps are not built: the claim is typed in and one image is attached.
+
 INPUT
 e-Challan screenshot/PDF
 

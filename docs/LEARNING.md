@@ -1,21 +1,125 @@
-# Learning Log
+# What We Learned
 
-Our learning focused on the architectural boundaries of multimodal AI inference, particularly the line between extracting observations and making decisions.
+Five things that actually happened while building ChallanCheck. Each one points at
+evidence you can open in this repository.
 
-## Initial Assumption
-When we started, our plan was to send the challan claim and the image to Amazon Bedrock and ask the multimodal model: "Is this challan correct?"
+**Provenance note.** An earlier draft of this file (and of `docs/SUBMISSION.md`) said
+the model "would guess guilt or innocence" when asked whether a challan was correct.
+We never observed that: Amazon Bedrock has never returned a response for this project
+(see `docs/CANONICAL_RUN.md`). The observe-only boundary is a design decision we made
+on day one, not a lesson from watching a model fail, and that sentence was removed.
 
-## What Failed
-We realized this creates an untrustworthy legal inference boundary. The model would sometimes "guess" guilt or innocence based on low-confidence artifacts (like blurry text or obstructed views). Because the output was a black-box conclusion, a user could not safely rely on it, nor could we deterministically test it for adversarial edge cases. It effectively functioned as a "legal defense generator" built on probabilism.
+### Learning 1 — Let the model observe, and let the evaluator refuse
 
-## What Was Learned
-To build a system with actual trust, the LLM must be strictly constrained to observation, not evaluation. 
-- **Amazon Bedrock (Observation)**: The multimodal model is exceptional at structured factual extraction (e.g., "Is a helmet visible?", "What type of vehicle is this?").
-- **Application Engine (Evaluation)**: Determining whether a factual observation contradicts a legal claim (e.g., "Car" vs "Without Helmet" violation) is a deterministic logic problem. 
+INITIAL ASSUMPTION:
+If the model only reports structured facts (`vehicle_type`, `helmet`, `image_quality`…)
+and never sees the challan text, plain rules can safely turn those facts into a result.
+That boundary was fixed in our first ChallanCheck commit (`docs/DECISION.md`, "Safety / Truth Rule").
 
-## Resulting Design Change
-We explicitly separated the architecture into two layers:
-1. **Bedrock Observation Layer**: Bedrock receives the image and returns a strictly typed JSON schema of visual facts and confidence scores (`{ "vehicle_type": "car", "helmet": "not_applicable" }`). It has no knowledge of the legal claim.
-2. **Deterministic Rule Engine**: An application-level rule matrix evaluates the Bedrock observations against the selected claim to produce a guaranteed, repeatable result (e.g., `OBSERVABLE_INCONSISTENCY` or `INSUFFICIENT_EVIDENCE`). 
+WHAT WENT WRONG / WHAT WE DISCOVERED:
+The boundary alone was not enough. The red-team's pre-registered case ADV-09 is a frame
+with a car and a motorcycle where the observer says "car" at 0.6 confidence. Without a
+confidence gate that frame resolves to "the evidence shows a car, which is not subject to a
+helmet requirement", a confident inconsistency built on a 60% guess. Our first rule engine
+lacked the gate and the matrix caught it (`docs/TASK_BOARD.md` P0-04).
 
-By constraining Bedrock to observation and keeping logic in code, we learned how to build verifiable trust boundaries around generative AI.
+WHAT WE LEARNED:
+Separating observation from evaluation moves the risk, it doesn't remove it. The observation
+has to carry its own doubt, and the evaluator has to be allowed to say "I can't tell".
+
+WHAT WE CHANGED:
+Every observed field carries a confidence; the schema adds `image_quality`, `occlusion` and
+`uncertainties[]`; the engine returns `INSUFFICIENT_EVIDENCE` below 0.7 confidence, on poor
+quality, or on severe occlusion. The result "consistent" is worded "No Mismatch Found"
+because the engine finds no contradiction; it does not confirm a match (QA RED-010).
+`tests/adversarial/rule_expectations.json` (14 cases) locks it in.
+
+### Learning 2 — A false positive is worse than a miss, even in deterministic code
+
+INITIAL ASSUMPTION:
+"Deterministic" means safe: text matching on the challan's violation label can't hallucinate.
+
+WHAT WENT WRONG / WHAT WE DISCOVERED:
+The red-team fed it real-world phrasing. "No helmet violation detected" was classified as a
+`WITHOUT_HELMET` claim, and "Registration number KA01AB1234" as a plate mismatch (QA RED-007).
+We then added OCR-noise tolerance (edit-distance-1 fuzzy matching), and that fix created two
+new fabricated claims: "All signals working normally" became a red-light violation, and
+"speed limits observed" became speeding (QA RED-009, cases CT-12/CT-13).
+
+WHAT WE LEARNED:
+A fabricated claim corrupts everything downstream, so the classifier may only suppress or
+match; it must never invent. Every fix needs an adversarial test, because the fix itself
+can open a new hole.
+
+WHAT WE CHANGED:
+Suppression guards run before matching, and each offence now needs an explicit cue next to
+its keyword. 13 classifier traps (`tests/adversarial/classifier_traps.json`) run in `npm test`,
+and unrecognised text degrades to `UNSUPPORTED_CHECK` instead of being guessed.
+
+### Learning 3 — Live and fixture adapters must never silently stand in for each other
+
+INITIAL ASSUMPTION:
+While Bedrock access was pending, a fixture adapter could keep the whole flow demonstrable,
+and swapping it for the live one later would be a one-line change.
+
+WHAT WENT WRONG / WHAT WE DISCOVERED:
+"Falls back to the fixture" is exactly how a demo ends up presenting canned data as AWS output.
+During this final audit we also found a related mislabel in our own error handling: the frontend
+relabelled every failed backend answer as `AWS_NOT_CONFIGURED`, so a configured account whose
+Bedrock call was refused would have been shown as "not configured" (commit `0450423`).
+
+WHAT WE LEARNED:
+Provenance has to be a first-class field, and failures have to keep their real cause.
+
+WHAT WE CHANGED:
+Fixture results carry `meta.source = "fixture"` and the UI badge says "Demo fixture — not live
+AWS evidence". `backend/server.js` and `backend/src/bedrockAdapter.js` never import the fixture
+adapter (static-guard tests), and a failed Bedrock call returns a coded error with no
+`observation` (502 `AWS_ERROR`). `tests/unit/liveFailureContract.test.js` pins both sides.
+
+### Learning 4 — Region, model and account access are part of the AWS architecture
+
+INITIAL ASSUMPTION:
+Pick a Claude model ID, call `InvokeModel`, and it works. When the call was refused, we treated it
+as a verification / propagation delay and polled for hours (`docs/AGENT_LOG.md`, 2026-09-19 01:05).
+
+WHAT WENT WRONG / WHAT WE DISCOVERED:
+Two separate things. (1) In `ap-south-1` the Claude models are inference-profile-only, so a bare
+model ID such as `anthropic.claude-sonnet-5` is not invokable on demand. (2) Every call then failed
+in about half a second with `ValidationException: Operation not allowed`, for every model we tried.
+On 2026-09-19 the Service Quotas view showed the applied value for "Global cross-region model
+inference tokens per minute for Anthropic Claude Sonnet 5" as `0`, against an AWS default of
+`6,000,000` (`docs/CANONICAL_RUN.md`).
+
+WHAT WE LEARNED:
+Model availability, inference profiles, regional routing and account quotas belong in the design
+review, not in a setup footnote. Compare applied quotas with defaults on day one, before waiting.
+A quota of 0 alongside an instant, identical refusal points at a static account limit rather than
+a delay; that is our inference. We can show the correlation but not AWS's internal mechanism,
+and we have not been able to lift it ourselves.
+
+WHAT WE CHANGED:
+`DEFAULT_MODEL_ID` is a system-defined inference profile (a test guards against a bare ID), the
+region and model are environment-overridable, and `npm run check:bedrock-text` is a one-call gate
+that tells "account/quota problem" apart from "image handling problem". The project stays in
+Mode B until a real multimodal call succeeds.
+
+### Learning 5 — Contracts must be tested across the boundary, not on each side
+
+INITIAL ASSUMPTION:
+If the frontend and the backend each pass their own tests, the upload flow works.
+
+WHAT WENT WRONG / WHAT WE DISCOVERED:
+The UI accepted 10 MB while the server capped images at 5 MB (8 MB for the JSON body), so a
+file could pass the client and then fail with HTTP 413 (QA RED-016). Related: the browser derives
+`File.type` from the filename, so a PNG saved as `.jpg` would reach Bedrock with the wrong media
+type. Neither side's own tests could see either problem.
+
+WHAT WE LEARNED:
+A limit or a code is a contract; the only test that counts reads both ends.
+
+WHAT WE CHANGED:
+The UI limit and copy are 5 MB (`0f5f639`), and the server trusts the image bytes over the declared
+type (`backend/src/imageType.js`). `tests/unit/uploadContract.test.js` now pins the frontend limit
+and copy to the backend's exported constants, checks that base64 inflation fits the body cap, and checks
+the client's accepted types are a subset of the server's.
