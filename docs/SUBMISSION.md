@@ -114,8 +114,9 @@ the primary variable AI cost** (billed by tokens; unmeasured here because no cal
 used because the core flow persists nothing; and nothing runs idle.
 
 **Ship It readiness: PARTIALLY READY.** AWS-hosted frontend and API: **yes**, verified in a real browser and with curl.
-Bedrock integration: implemented. Live Bedrock inference: **blocked** by the AWS account (a refusal, not a code fault), so
-a deployed end-to-end analysis run does not exist and full Bedrock Ship It success is not claimed. Fixture demo path:
+Bedrock integration: implemented in code, never yet run successfully. Live Bedrock inference: **blocked**: AWS refuses every
+call (`ValidationException: Operation not allowed`); we believe an account-level limit is the cause but have not proven it.
+A deployed end-to-end analysis run therefore does not exist, and full Bedrock Ship It success is not claimed. Fixture demo path:
 proven locally and on the public site, labelled as a fixture. Silent fallback to fixtures on the live path: none.
 
 ## What we learned

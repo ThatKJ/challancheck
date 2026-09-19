@@ -168,7 +168,7 @@ account's quota page are applied at `0`, including the Nova Lite and Nova 2 Lite
 do not prove the quota is the cause**, and this project does not claim they do. The Lambda's role resolved credentials
 (no `AWS_NOT_CONFIGURED`) and the request reached Bedrock, which refused it; whether the role's permissions suffice for
 a *successful* invocation is unverified. Per the decision rule for this run, no further attempt was made to fix Bedrock
-through code; the account-level refusal is a matter for AWS Support.
+through code; the refusal looks account-level (cause not proven), which is a matter for AWS Support.
 
 **Selected claim and result.** In the deployed UI the claim text entered was "Riding without helmet" with a synthetic
 image; there is no observation and no result, only the coded error above, because Bedrock never answered.

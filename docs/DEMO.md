@@ -19,7 +19,7 @@ The demo has exactly two product cases and four beats:
 - Re-run `npm run check:bedrock-text` once beforehand. If it now **passes**, stop: this script is out of date;
   follow `docs/CANONICAL_RUN.md` section 3 and the Mode A delta.
 
-## MODE B script (target 2:55)
+## MODE B script (target 2:57; trim a sentence if you speak slowly, the limit is 3:00)
 
 **0:00–0:18 — User and problem** · *Screen: first screen, "A claim is only half the picture."*
 > "An e-Challan cites a violation and attaches a photo as evidence. If the photo doesn't seem to show that
@@ -40,19 +40,19 @@ The demo has exactly two product cases and four beats:
 > "Now an ambiguous case: poor image quality, severe occlusion, helmet uncertain at 30% confidence. The same rules
 > refuse to overclaim. 'We won't guess.' Saying 'I can't tell' is a first-class result, not an error."
 
-**1:45–2:25 — AWS and architecture** · *Screen: README "Trust boundary" diagram → the public URL: Upload evidence → Review evidence → the error banner → terminal: `npm run check:bedrock-text` → `docs/CANONICAL_RUN.md` section 2b.*
+**1:45–2:27 — AWS and architecture** · *Screen: README "Trust boundary" diagram → the public URL: Upload evidence → Review evidence → the error banner → terminal: `npm run check:bedrock-text` → `docs/CANONICAL_RUN.md` section 2b.*
 > "Amazon Bedrock is designed to be the observer only: it gets the image, never the challan text, and its reply must
 > pass our schema. Our app and API are deployed on AWS, in Mumbai. Upload a photo and the Lambda calls Bedrock, and
 > our account refuses it — 'Operation not allowed', in about half a second — so the app shows that error and never
-> fixture data. The applied quota for this model is zero, against an AWS default of six million. The engine and
-> schema are real and tested; the Bedrock integration is written but has not run successfully."
+> fixture data. The applied quota for this model shows zero, against an AWS default of six million; we can't say that
+> is why. The engine and schema are real and tested; the Bedrock integration is written but has not run successfully."
 
-**2:25–2:47 — Learning** · *Screen: `docs/LEARNING.md`.*
+**2:27–2:49 — Learning** · *Screen: `docs/LEARNING.md`.*
 > "Two lessons. Observe-only isn't enough: our first rule engine turned a 60%-confidence 'car' into a confident
 > mismatch until an adversarial test caught it, so observations now carry their own doubt. And model access is
 > architecture: we waited hours for a 'propagation delay' when the quota view showed a flat zero."
 
-**2:47–2:55 — Close**
+**2:49–2:57 — Close**
 > "ChallanCheck makes the comparison explicit and reviewable, and says 'I can't tell' when it can't."
 
 ## Never say or show in Mode B
