@@ -44,8 +44,12 @@ export async function observeEvidenceViaLiveBackend({ imageBase64, mimeType }) {
   }
 
   if (!response.ok) {
-    const err = new Error(`Backend returned HTTP ${response.status}`);
-    err.code = "AWS_NOT_CONFIGURED";
+    // backend/server.js answers every failure with { error: { code, message } }
+    // and never an observation. Keep that code: "Bedrock refused the call"
+    // (AWS_ERROR) is a different fact from "no backend configured".
+    const coded = await response.json().then((body) => body?.error, () => null);
+    const err = new Error(coded?.message || `Backend returned HTTP ${response.status}`);
+    err.code = typeof coded?.code === "string" ? coded.code : "AWS_NOT_CONFIGURED";
     throw err;
   }
 
