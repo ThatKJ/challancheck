@@ -168,3 +168,60 @@ RELEASE CANDIDATE — **FAIL (overall, solely on RED-001 live AWS; Mode A only)*
 ## Handoff pointer
 
 Next REDTEAM loop: retest P0-04 against `tests/adversarial/rule_expectations.json` the moment BUILD claims it; re-run `scripts/verification/secret_scan.sh` after any env/secret change; keep attacking Bedrock prompt-bias/repeatability once P0-02 spike lands (blur/crop/multi-vehicle variants).
+
+---
+
+# RESWEEP 2026-09-19 — temporary red-team auditor (Claude offline window)
+
+Scope: read-only audit + REDTEAM-owned tooling only. No product redesign, no new features, no backend-arch changes. Execution evidence: `npm test` 89/89 pass, `npm run build --prefix frontend` pass (vite 8.3.0), `oxlint` clean, `secret_scan.sh` exit 0 after hardening (negative controls below), `claims_audit.sh` re-run, `bedrock_live_verify.sh` re-run (SKIP, 0 fixtures). Working tree was clean at sweep start except one uncommitted TASK_BOARD line (P1-07 TODO→DONE), which the human committed mid-sweep as `ac4703f` — no auditor action needed. Prior RED-001..RED-013 dispositions above stand; only deltas and new findings are recorded here.
+
+## ID: RED-014
+Severity: P0
+Claim/Component: Live AWS/Bedrock observation path (carryover of RED-001; TASK_BOARD P0-01/P0-02)
+Expected: One real, successful Bedrock invocation in-region.
+Actual: Still never succeeded. `scripts/fixtures/` is empty (0 images), `bedrock_live_verify.sh` → SKIP, and the account gate (`ValidationException: Operation not allowed`, quotas 0) is AWS-side per TASK_BOARD P0-01. Adapter, spike, text-check, server wrapper, and honest-failure paths all exist and are correct by read — the missing piece remains credentials/gate + first green run, unchanged.
+Reproduction: `sh scripts/verification/bedrock_live_verify.sh` → `SKIP: only 0 fixture image(s)`; `ls scripts/fixtures/` → empty.
+Evidence: same files as RED-001; TASK_BOARD.md P0-01/P0-02.
+Recommended smallest fix: human-owned only — when the gate clears, run `npm run check:bedrock-text`, drop 5 images into `scripts/fixtures/`, run `npm run spike:bedrock` (L-01..L-11 checklist), then overwrite CANONICAL_RUN.md with Mode A metrics.
+Status: OPEN (sole P0; blocks Mode A only — Mode B demo path unaffected)
+
+## ID: RED-015
+Severity: P1
+Claim/Component: Release-gate security scan (`scripts/verification/secret_scan.sh`; freeze step 9 claims COMPLETED)
+Expected: Scanner exits 0 on a clean tree so the gate is trustworthy.
+Actual: Scanner exited 1 on the clean tree — three self-false-positives, zero real leaks: (a) filename check matched the scanner's own filename (`secret_scan.sh` contains "secret"); (b) content check matched the scanner's own `for pat in 'aws_secret_access_key'...` definition lines plus QA/AGENT_LOG prose quoting the patterns; (c) history `-S` check fired on the commits that introduced the scanner literals themselves. Independently verified NO real leak: no `AKIA[0-9A-Z]{16}` value outside pattern literals, no `aws_secret_access_key =` assignment, no private-key block, no `.env` tracked, `~/.aws` outside repo, AWS SDK absent from frontend src and dist bundle (dist "bedrock" hit is only the UI label string "Source: Amazon Bedrock").
+Reproduction (pre-fix): `sh scripts/verification/secret_scan.sh` → `SCANNER_EXIT:1` with `LEAK: sensitive filename tracked`, `LEAK: pattern aws_secret_access_key`, `LEAK in history` lines.
+Recommended smallest fix: harden the scanner (REDTEAM-owned, safe to touch) — self-exclude own filename, match `aws_secret_access_key` assignment-shaped only (`key\s*[:=]\s*<20+ base64 chars>`, so prose/`= ...` never trips), history scan on added-diff value-shaped lines excluding bracket-form regex literals.
+Status: FIXED 2026-09-19 by auditor in `scripts/verification/secret_scan.sh` (uncommitted — see handoff). Verified: exit 0 on clean tree; negative controls all correct — planted AKIA-shaped value → exit 1, planted key assignment → exit 1, planted prose (`aws_secret_access_key = ...`) → exit 0 (plant files removed after).
+
+## ID: RED-016
+Severity: P1
+Claim/Component: Frontend/backend upload contract — file-size limits (`frontend/src/App.jsx`, `backend/server.js`)
+Expected: Anything the client accepts, the server accepts (or the client says so upfront).
+Actual: Mismatch. Frontend accepts up to 10 MB and its copy says "up to 10 MB" (App.jsx:53, dropzone hint); backend caps the JSON envelope at 8 MB (`MAX_BODY_BYTES`) and decoded image at 5 MB (`MAX_IMAGE_BYTES`, server.js:22-23). Base64 inflates ~33%: a 10 MB photo becomes ~13.3 MB JSON → 413 PAYLOAD_TOO_LARGE; any image over 5 MB → 413 IMAGE_TOO_LARGE — both AFTER passing client validation. Dormant today (fixture path never hits the backend; live path errors honestly before upload matters), but it bites the moment the live backend is wired — i.e. exactly when Mode A unblocks and pressure is highest.
+Reproduction: static — read App.jsx:53 vs server.js:22-23; arithmetic: 10 MB × 4/3 ≈ 13.3 MB > 8 MB; 5 MB < image ≤ 10 MB passes client, fails server.
+Evidence: same lines.
+Recommended smallest fix (BUILD-owned — auditor did NOT touch): align frontend limit + copy to the backend truth (5 MB image, i.e. reject >5 MB client-side with "up to 5 MB" copy), OR raise backend `MAX_BODY_BYTES`/`MAX_IMAGE_BYTES` to cover 10 MB (then re-check Bedrock's own per-image limit). Either is a 2-line change + copy. P2 sub-note in the same contract: frontend `accept` omits `image/gif` while backend `sniffImageType` accepts GIF — safe direction (backend superset), align the accept lists while touching this.
+Status: OPEN
+
+## ID: RED-017
+Severity: P1
+Claim/Component: README judge-facing AWS claims, present tense (`README.md:29-30`)
+Expected: Every judge-facing claim traceable to implementation or a verified run (RED-003 contract).
+Actual: Residual RED-003 gap the closure evidence missed (it cited README:10/:39, not these lines): "The Bedrock integration **performs** multimodal visual observation … to **extract** strictly factual data" and "Application rules deterministically compare … to **produce consistent, reliable** outcomes" describe the never-yet-successful live path as built capability. The old `claims_audit.sh` missed it because its grep was case-sensitive (`Performs multimodal` vs lowercase "performs").
+Reproduction: `sh scripts/verification/claims_audit.sh` (after auditor's `-i` fix) flags README.md:29; read README.md:29-30.
+Evidence: same lines; SUBMISSION.md:9 Mode-A hits are explicitly conditional ("Use this ONLY if…") — not a finding; AGENT_LOG hits are historical prose — not a finding.
+Recommended smallest fix (LEAD/BUILD-owned — auditor did NOT touch product docs): re-tense the two bullets to designed-to/conditional ("is designed to perform…", gate on Mode A exactly like SUBMISSION.md does). Tooling half already done: auditor added `-i` to the present-tense grep in `scripts/verification/claims_audit.sh`.
+Status: OPEN
+
+## Resweep verified-clean (no finding filed)
+
+- Tests 89/89 + frontend build + oxlint: all green (execution above).
+- No `console.*` in `frontend/src` (zero app-code console surface); backend `console.log` is server-side request logging only.
+- Fixture/live separation holds: `backend/server.js` never imports `fixtureAdapter` (comment + no import, verified by grep); `frontend/src` never imports `bedrockAdapter`/AWS SDK; dist bundle contains no SDK (only the "Source: Amazon Bedrock" UI label).
+- Multi-claim contract holds end-to-end by read: `claims[]` surfaced, `requiresSelection` gate in `auditEvidence.js:44-53`, ClaimScreen `useState(null)` + `disabled={!choice}`, "Review another claim" path preserves `data.claims`.
+- Unsupported/ambiguity behavior holds by read: unknown claims → `UNSUPPORTED_CHECK` (ruleEngine default), bad observations → `INSUFFICIENT_EVIDENCE` (schema gate), low-confidence/uncertain/unknown-vehicle → `INSUFFICIENT_EVIDENCE`, unknown status → "Unknown Result" fallback in `presentResult`.
+- Responsive/motion static recheck only (no browser in this window): breakpoints at 1500/1100/800/600 + `prefers-reduced-motion` present in App.css; prior live-browser verdicts (RED-012/RED-013 CLOSED) stand undisturbed — no UI files touched.
+- Secrets: see RED-015 (no real leak found by any check).
+- Deployment: P1-06 CUT is intentional and consistently documented (handoff + TASK_BOARD); `server.js` binds loopback with `PORT`/`ALLOWED_ORIGINS` overrides — nothing to fix for a local-demo plan.
+- P2 note (not action-required, recorded for completeness): `frontend/README.md` is still the stock Vite template ("This template provides a minimal setup…") — stale but not judge-facing; root README is the submission surface. Fix only if touching frontend docs anyway.

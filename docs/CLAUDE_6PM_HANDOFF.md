@@ -1,78 +1,107 @@
 # Claude 6 PM Handoff
 
-This document is the precise handoff for Claude resuming at 6 PM. The project is currently in **FINAL MODE**. We are targeting the "Ship It" and "Best UI" judging categories for the First Commit Hackathon. 
+Auditor resweep completed 2026-09-19 ~15:25 UTC window (Claude offline). Prior handoff content below was verified line-by-line against the repo and updated — do not trust the pre-sweep version.
 
 ## CURRENT STATE
-The project codebase is completely frozen. The UI and Backend integration for the local fixture demo (Mode B) is complete, tested, and passing all checks (89/89 tests). We are currently blocked exclusively by an AWS-side account verification delay (`ValidationException: Operation not allowed` on Bedrock).
+
+**FINAL MODE, Mode B ready.** `npm test` 89/89 pass, `npm run build --prefix frontend` passes, `oxlint` clean, `secret_scan.sh` exit 0 (after auditor hardening, see below). Sole P0 remains the AWS-side Bedrock account gate — unchanged, human-owned, blocks Mode A only.
 
 ## LAST KNOWN GOOD COMMITS
-- `7560a13` (docs: align submission narrative, learning log, and demo script to final criteria) - **HEAD**
+
+- `ac4703f` (docs: add CLAUDE_6PM_HANDOFF.md and mark P1-07 as DONE) - **HEAD** (landed mid-sweep from the human; resolves the one uncommitted file the sweep found)
 - `c09b107` (chore: consolidate final frontend and backend artifacts for freeze) - **Code Freeze**
 
+## UNCOMMITTED WORK (auditor's — review before committing)
+
+- `scripts/verification/secret_scan.sh` — self-false-positive hardening (RED-015 fix). Verified: exit 0 clean; planted-AKIA → exit 1; planted key assignment → exit 1; planted prose → exit 0. Safe to commit.
+- `scripts/verification/claims_audit.sh` — one-flag fix (`-i` on the present-tense grep; caught README:29, see RED-017). Safe to commit.
+- `docs/QA_REPORT.md` — appended RESWEEP section (RED-014..RED-017). Safe to commit.
+- `docs/CLAUDE_6PM_HANDOFF.md` — this rewrite. Safe to commit.
+
+No other uncommitted changes. No stash. Nothing else was modified — product code untouched.
+
 ## FRONTEND STATUS
-- **Status**: FROZEN (UI Gate = PASS)
-- **Details**: The 3-screen React app (upload, claim selection, side-by-side audit) is fully responsive, polished, and handles all edge cases (AWS down, multiple claims). 
+
+- **Status**: FROZEN (UI Gate = PASS, undisturbed — no UI files touched in this window)
+- **Details**: 3-screen app verified by prior live-browser gate; static recheck in this window (zero `console.*` in `frontend/src`, breakpoints + `prefers-reduced-motion` present, no AWS SDK in src or dist) found nothing new.
 
 ## BACKEND STATUS
-- **Status**: FROZEN (89/89 Tests Passing)
-- **Details**: Deterministic rule engine, observation schema validation, and violation extraction are fully implemented and verified against adversarial traps. The Bedrock adapter (`bedrockAdapter.js`) is written and cleanly fails with `AWS_NOT_CONFIGURED` or `AWS_ERROR` when appropriate. A local Node server (`server.js`) wraps the adapter for the UI.
+
+- **Status**: FROZEN (89/89 tests passing, re-executed in this window)
+- **Details**: Rule engine, schema validation, classifier, fixture/live separation all hold by re-read. One NEW contract finding for BUILD (no fix applied — BUILD-owned): **RED-016**: frontend accepts 10 MB uploads, backend caps at 5 MB image / 8 MB body → 5–10 MB files pass the client then 413. Align frontend limit+copy to 5 MB or raise backend limits.
 
 ## AWS STATUS
-- **Status**: BLOCKED (AWS Account Verification Delay)
-- **Details**: AWS CLI identity is verified, but Bedrock invocation throws `ValidationException: Operation not allowed` across all models. We are waiting for the AWS-side account verification gate to clear.
+
+- **Status**: BLOCKED (AWS Account Verification Delay) — unchanged
+- **Details**: `bedrock_live_verify.sh` → SKIP (0 fixtures in `scripts/fixtures/`). Adapter/spike/text-check/server wrapper all correct by read; first green run still owed. See RED-014.
 
 ## OPEN P0
-- **P0-01**: Verify AWS credentials/model access (Waiting for Bedrock to unblock).
+
+- **RED-014** (carryover of RED-001): live Bedrock invocation never succeeded. Human-owned AWS gate.
 
 ## OPEN P1
-- **None.** All P1s (Demo Narrative, Failure States, Violation Extraction, UI) are DONE.
+
+- **RED-015**: scanner false-red gate — **FIXED by auditor, uncommitted** (commit the two scanner files to bank it).
+- **RED-016**: 10 MB (frontend) vs 5 MB / 8 MB (backend) upload-limit mismatch — **OPEN, BUILD-owned**, 2-line + copy fix specified in QA_REPORT.
+- **RED-017**: README:29-30 present-tense live-path claims ("performs… to extract…", "to produce consistent, reliable outcomes") — **OPEN, LEAD/BUILD-owned**, re-tense to designed-to/Mode-A-conditional.
+- All pre-sweep P1s remain CLOSED. No new P0.
 
 ## EXACT FILES TO TOUCH
+
+**Bank the audit (recommended first commit):**
+- `scripts/verification/secret_scan.sh`, `scripts/verification/claims_audit.sh`, `docs/QA_REPORT.md`, `docs/CLAUDE_6PM_HANDOFF.md` (this file)
+
 **If AWS unblocks (Mode A):**
-- `scripts/fixtures/*` (Drop 5 evidence images here for the spike)
-- `docs/CANONICAL_RUN.md` (Update metrics with the Live AWS run)
-- `docs/SUBMISSION.md` (Delete the Mode B section, keep Mode A)
-- `README.md` (Remove the "If Mode A" conditional text)
+- `scripts/fixtures/*` (drop 5 evidence images)
+- `README.md:29-30` (re-tense per RED-017 — required in BOTH modes, judges read it regardless)
+- `frontend/src/App.jsx:53` + dropzone copy (align to backend 5 MB per RED-016 — required before any live demo with real phone photos)
+- `docs/CANONICAL_RUN.md` (overwrite with live metrics)
+- `docs/SUBMISSION.md` (delete Mode B section, keep Mode A)
 
 **If AWS does NOT unblock (Mode B):**
-- **ZERO FILES**. Do not touch anything. The project is ready for submission as-is.
+- `README.md:29-30` (RED-017 re-tense — still required; it claims live capability that was never demonstrated)
+- Nothing else. No product code changes.
 
 ## EXACT COMMANDS TO RUN
-To check if AWS is unblocked:
+
 ```bash
-# 1. Verify identity
+# 0. Bank the audit + verify green baseline
+git add scripts/verification/secret_scan.sh scripts/verification/claims_audit.sh docs/QA_REPORT.md docs/CLAUDE_6PM_HANDOFF.md
+git commit -m "chore: harden secret scanner, fix claims-audit case gap, record red-team resweep"
+sh scripts/verification/secret_scan.sh; echo "exit:$?"   # want 0
+npm test                                                  # want 89/89
+npm run build --prefix frontend                           # want pass
+
+# 1. AWS unblock check (human-owned)
 aws sts get-caller-identity
-
-# 2. Run the minimal text-check to isolate image issues
 npm run check:bedrock-text
+npm run spike:bedrock   # needs 5 images in scripts/fixtures/ first
 
-# 3. If text-check passes, run the multimodal spike
-npm run spike:bedrock
-```
-
-To run the full E2E application locally:
-```bash
-# Terminal 1: Start Backend Server
-npm run server
-
-# Terminal 2: Start Frontend
-npm run dev --prefix frontend
+# 2. Local E2E (either terminal pair)
+npm run server                                   # Terminal 1 (127.0.0.1:8787)
+npm run dev --prefix frontend                    # Terminal 2
 ```
 
 ## EXPECTED RESULTS
-- `npm run check:bedrock-text` should exit 0 and print `PASS` with latency metrics.
-- `npm run spike:bedrock` should successfully parse the fixture images and return structured JSON matching the Observation Schema.
+
+- `secret_scan.sh` → exit 0 with all-ok lines (post-fix baseline recorded in QA RED-015).
+- `npm test` → 9 files, 89 tests, all pass.
+- `npm run check:bedrock-text` → exit 0 + `PASS` + latency (only after AWS gate clears; currently expected FAIL/SKIP).
+- `npm run spike:bedrock` → one schema-valid record per fixture image (only after gate clears + fixtures added).
 
 ## DEPLOYMENT PLAN
-- **Status**: CUT.
-- **Details**: P1-06 (Deployment) was explicitly cut to prioritize core functionality and demo clarity. The final demo will be recorded running locally (`npm run server` + `npm run dev`), which is fully acceptable for the "Build It" tier, and we will lean on the strict Bedrock isolation architecture for the learning story.
+
+- **Status**: CUT (intentional, consistently documented). Local demo (`npm run server` + `npm run dev`) is the plan. `server.js` binds loopback; `PORT`/`ALLOWED_ORIGINS` env overrides exist. Nothing to fix.
 
 ## CANONICAL RUN PLAN
-- **Current (Mode B)**: Recorded in `CANONICAL_RUN.md`. Total request latency is ~28ms using synchronous local fixture adapter.
-- **Target (Mode A)**: If AWS unblocks, you must execute ONE verified E2E run against a real challan image, record the AWS latency, the detected claims, and the Bedrock observations, and overwrite `CANONICAL_RUN.md` with these real metrics.
+
+- **Current (Mode B)**: `CANONICAL_RUN.md` stands (28 ms fixture path). Do not touch unless Mode A lands.
+- **Target (Mode A)**: one verified E2E run on a real challan image → overwrite `CANONICAL_RUN.md` with region, model, latency, claims, observations, verdict.
 
 ## DO-NOT-TOUCH AREAS
-- **Frontend Code**: Do not touch `frontend/src/*`. The UI is polished and frozen.
-- **Core Engine**: Do not touch `backend/src/ruleEngine.js` or `backend/src/observationSchema.js`.
-- **Architectural Boundary**: Do NOT allow the LLM to make legal evaluations. Bedrock is for strictly factual visual observation ONLY. 
-- **Features**: Do NOT add any new features (auth, dashboards, PDF parsing, maps, etc.). The project is in FINAL MODE.
+
+- `frontend/src/*` — frozen, gate passed. (RED-016 fix touches one limit + copy string only.)
+- `backend/src/ruleEngine.js`, `backend/src/observationSchema.js` — frozen core.
+- Architectural boundary: Bedrock observes ONLY; never let the model decide guilt/legality/cancellation.
+- No new features (auth, dashboards, PDF parsing, maps, Hindi classifier support, illustrative fixture imagery — all explicitly cut or deferred in QA).
+- Do not "fix" RED-014 with mocks, fixture-as-live relabeling, or prompt tricks. A coded honest error beats a fabricated green run.
