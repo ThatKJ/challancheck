@@ -12,6 +12,7 @@
     "vitest": "^5.0.1"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.700.0"
+    "@aws-sdk/client-bedrock-runtime": "^3.700.0",
+    "@aws-sdk/client-rekognition": "^3.1136.0"
   }
 }

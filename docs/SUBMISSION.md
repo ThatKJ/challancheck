@@ -1,9 +1,11 @@
 # Submission Narrative
 
-**Selected mode: B — AWS NOT VERIFIED** (as of 2026-09-19).
-Amazon Bedrock has not returned a successful response for this project. The demonstrated
-observation path is a local fixture adapter. The Mode A copy at the end of this file is a
-template that must not be used unless `docs/CANONICAL_RUN.md` section 3 is complete.
+**Selected mode: live AWS observation through Amazon Rekognition; Amazon Bedrock blocked** (as of 2026-09-20).
+The original intended multimodal observer was Amazon Bedrock. It never returned a successful response: AWS Support
+confirmed that the newly created account had temporary service and model restrictions. The final live upload path
+therefore uses Amazon Rekognition `DetectLabels`, verified on the public deployment (`docs/CANONICAL_RUN.md` section 2c).
+The fixture demo is separate and labelled. The "Mode A" copy at the end of this file is a Bedrock template that must not
+be used unless `docs/CANONICAL_RUN.md` section 3 is complete.
 
 ## Problem
 
@@ -21,8 +23,8 @@ observable facts in the attached photograph, using a strict boundary:
 source evidence → visual observation → structured facts → deterministic evaluation → result
 ```
 
-The observer (Amazon Bedrock by design, a local fixture adapter in the demo) only produces
-structured facts. Application code alone evaluates them against the selected claim and returns
+The observer (Amazon Rekognition in the live upload path, a labelled local fixture adapter in the demo; Amazon Bedrock
+was the original design) only produces structured facts. Application code alone evaluates them against the selected claim and returns
 one of `OBSERVABLE_INCONSISTENCY`, `CONSISTENT_WITH_EVIDENCE` (shown as "No Mismatch Found"),
 `INSUFFICIENT_EVIDENCE` or `UNSUPPORTED_CHECK`. It never decides guilt, innocence, legal validity,
 or what the user should do.
@@ -34,7 +36,8 @@ or what the user should do.
   If a challan cites several offences, all are surfaced and the user must choose one; nothing is
   chosen silently (`backend/src/violationClassifier.js`, 13 adversarial traps).
 - **Observation schema.** Every observation is validated; a malformed one degrades to
-  `INSUFFICIENT_EVIDENCE` instead of crashing (`backend/src/observationSchema.js`).
+  `INSUFFICIENT_EVIDENCE` instead of crashing (`backend/src/observationSchema.js`). For the Rekognition observer the
+  `occlusion` and `image_quality` fields gained an explicit `"unknown"`, so "not measured" is never recorded as "none" or "good".
 - **Deterministic rule engine.** 14 pre-registered adversarial cases plus unit tests. Its one supported
   check is "riding without helmet" against vehicle type and helmet observation.
 - **Uncertainty handling.** Low confidence, poor image quality, severe occlusion or an unknown vehicle
@@ -45,79 +48,94 @@ or what the user should do.
   canned, carry `meta.source = "fixture"`, and the UI says "Demo fixture — not live AWS evidence".
 - **UI.** Three screens (evidence, claim selection, report), verified live in a browser earlier
   (`docs/QA_REPORT.md`); build and lint pass.
-- **Failure honesty.** The local backend relay returns a coded error and no observation when Bedrock
-  refuses a call; tests pin that at the server, the adapter and the frontend client.
-- **AWS deployment.** The web app and API are deployed at https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
-  (API Gateway → one Lambda, `ap-south-1`) and were verified with curl and in a real browser: `GET /health` → 200,
-  and `POST /audit` reaches the Lambda and Bedrock, which refuses it, so the API returns a coded HTTP 502 `AWS_ERROR`
-  with no observation and no fixture fallback. The deployed code is byte-identical to commit `110e283` on `main`
-  (`docs/CANONICAL_RUN.md` section 2b).
+- **Live observation through Amazon Rekognition.** `backend/src/rekognitionAdapter.js` calls `DetectLabels`
+  (`GENERAL_LABELS` + `IMAGE_PROPERTIES`) and normalizes the response into the schema. The mapping is conservative and
+  pinned by 62 tests (some run against a trimmed copy of the real response): a missing label is never read as absence; helmet is
+  `uncertain` unless a helmet is detected at the head of every detected person (never `not_visible`); two different vehicle
+  types in one photo give an unknown vehicle; plate text and occlusion are not claimed.
+- **Failure honesty.** The backend returns a coded error and no observation when Rekognition fails
+  (`AWS_ERROR`, `AWS_NOT_CONFIGURED`, or `UNSUPPORTED_IMAGE` for a WebP/GIF, refused before any AWS call); tests pin that
+  at the adapter, the server, the Lambda and the frontend client.
+- **AWS deployment and live run.** The web app and API are deployed at https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
+  (API Gateway → one Lambda, `ap-south-1`). On 2026-09-20 a real photo was uploaded through the public app in a real browser:
+  one `POST /api/audit` → HTTP 200 with `meta.source = "amazon_rekognition"`, and the report was badged "Live AWS
+  observation · Amazon Rekognition". The Lambda log and CloudTrail show the Rekognition call; the function's IAM role allows
+  `rekognition:DetectLabels` and nothing on Bedrock. The result for that photo was Insufficient Evidence, because Rekognition
+  labelled both a car and a motorcycle (`docs/CANONICAL_RUN.md` section 2c).
 
 ### What is blocked
 
-Real Amazon Bedrock multimodal execution. No live observation of a real photo exists, so nothing here
-demonstrates model accuracy, latency or repeatability.
+Amazon Bedrock multimodal execution, the original design. One real photo has been analysed end to end through Rekognition,
+but nothing here demonstrates accuracy or repeatability across real challan photos, and Rekognition cannot establish helmet
+use, so a helmet claim ends as Insufficient Evidence unless a helmet is positively detected.
 
-### Why (exact blocker, executed 2026-09-19)
+### Why Bedrock was blocked (exact record, executed 2026-09-19)
 
 Every `InvokeModel` call from our AWS account (`ap-south-1`, profile `global.anthropic.claude-sonnet-5`)
 fails in about half a second with `ValidationException: Operation not allowed`, for text-only and for
 image requests alike. The account's applied quota for "Global cross-region model inference tokens per
 minute for Anthropic Claude Sonnet 5" is `0`, against an AWS default of `6,000,000`, and Bedrock reports
-the model `NOT_AUTHORIZED` for the account. We believe an account-level limit is the cause; we have not
-been able to lift it. Full command record: `docs/CANONICAL_RUN.md` section 2.
+the model `NOT_AUTHORIZED` for the account. AWS Support later confirmed that the account, being newly created,
+had temporary restrictions on some services and model access; they were not lifted during the event, which is why
+the live path uses Rekognition instead. Full command record: `docs/CANONICAL_RUN.md` section 2.
 
 ## Where AWS fits
 
-Amazon Bedrock is designed to be the visual observer, and only that. `backend/src/bedrockAdapter.js`
-sends the image with a prompt that forbids legal reasoning and does not contain the challan text,
-requires JSON matching the observation schema, and raises a coded error (`AWS_NOT_CONFIGURED`,
-`AWS_ERROR`) on any failure instead of substituting data. That code is implemented and tested against
-real AWS state. It has never completed a successful call, so live AWS mode is unverified.
+Amazon Rekognition `DetectLabels` is the visual observer on the live upload path, and only that.
+`backend/src/rekognitionAdapter.js` sends the image bytes (never the challan text), maps the returned labels, instance boxes
+and image-quality measurements into the observation schema, validates it, and raises a coded error (`AWS_NOT_CONFIGURED`,
+`AWS_ERROR`, `UNSUPPORTED_IMAGE`) on any failure instead of substituting data. It reports only what Rekognition returns:
+helmet use, plate text and occlusion are not established by label detection, so they are left `uncertain` / `unknown` and
+listed in the observation's `uncertainties`. Rekognition never decides anything; the deterministic rule engine does.
+
+Amazon Bedrock (Claude) was the original design. `backend/src/bedrockAdapter.js` is implemented and tested against real AWS
+state, but the account never let a call succeed, so it is not on the live path and the deployed role cannot call it.
 
 ## Architecture: current vs target
 
 **CURRENT (what exists)**
 
-*Locally* (unchanged):
+*Locally:*
 
 ```
 React/Vite app ──┬─ "Explore an example" → fixture adapter (canned observation, no AWS call)
-                 └─ "Upload evidence"    → POST /audit → local Node relay → Amazon Bedrock (unverified)
+                 └─ "Upload evidence"    → POST /audit → local Node relay → Amazon Rekognition DetectLabels
          schema validation → deterministic rule engine (same module, runs in the browser) → result
 ```
 
-*Deployed on AWS* (`ap-south-1`, verified 2026-09-19, record in `docs/CANONICAL_RUN.md` section 2b):
+*Deployed on AWS* (`ap-south-1`, verified 2026-09-20, record in `docs/CANONICAL_RUN.md` section 2c):
 
 ```
-browser ──► API Gateway (HTTP API) ──► one Lambda ──► Amazon Bedrock
+browser ──► API Gateway (HTTP API) ──► one Lambda ──► Amazon Rekognition (DetectLabels)
               POST /audit and            · serves the built web app (static files)
               POST /api/* throttled      · GET /health, POST /audit (image → observation relay);
                                            also served as /api/health and /api/audit
 ```
 
 Public URL: https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com
-The gateway and Lambda respond. **The Bedrock call made from the Lambda is refused by the AWS account** (the same
-`ValidationException: Operation not allowed`), so the deployed live path returns a coded `AWS_ERROR` (HTTP 502)
-and never an observation. The site's demo mode is the same labelled fixture demo, and nothing on it is presented
-as Bedrock output. The rule engine still runs in the browser.
+The Lambda sends the uploaded image to Rekognition, normalizes the labels into the observation schema, validates it, and
+returns `{ observation, meta }` with `meta.source = "amazon_rekognition"`; on any failure it returns a coded error and no
+observation. The site's demo mode is the same labelled fixture demo, and nothing on it is presented as live. The rule
+engine still runs in the browser: AWS observes, application code evaluates.
 
-**TARGET (Ship It)** is this same shape with one difference: a successful Bedrock invocation. It is not claimed.
+**Original target:** the same shape with Amazon Bedrock as the observer. It was not achievable in the event because the
+account's Bedrock access stayed restricted; the Bedrock adapter remains in the repository, unused by the deployed function.
 
-**AWS services deployed:** API Gateway (HTTP API), Lambda, IAM (one least-privilege execution role), CloudWatch Logs,
-and one private S3 bucket that holds only the deployment zip. Nothing else is deployed.
+**AWS services deployed:** API Gateway (HTTP API), Lambda, IAM (one least-privilege execution role: `rekognition:DetectLabels`
+and its own log group), CloudWatch Logs, and one private S3 bucket that holds only the deployment zip. Amazon Rekognition
+is called, not provisioned. Nothing else is deployed.
 One Lambda serves both the static app and the API, so there is one origin (no CORS) and no separate hosting stack.
 
 **Cost drivers (no prices claimed):** the static files are small and served by the same request-driven function, so
-there is no always-on server; API Gateway and Lambda bill per request and nothing while idle; **Bedrock inference is
-the primary variable AI cost** (billed by tokens; unmeasured here because no call has succeeded); no database is
-used because the core flow persists nothing; and nothing runs idle.
+there is no always-on server; API Gateway and Lambda bill per request and nothing while idle; **Rekognition `DetectLabels`
+is the primary variable AI cost** (billed per image; unmeasured here); no database is used because the core flow persists
+nothing; and nothing runs idle.
 
-**Ship It readiness: PARTIALLY DEPLOYED, NOT READY.** AWS-hosted frontend and API: **yes**, verified in a real browser and with curl.
-Bedrock integration: implemented in code, never yet run successfully. Live Bedrock inference: **blocked**: AWS refuses every
-call (`ValidationException: Operation not allowed`); we believe an account-level limit is the cause but have not proven it.
-A deployed end-to-end analysis run therefore does not exist, and full Bedrock Ship It success is not claimed. Fixture demo path:
-proven locally and on the public site, labelled as a fixture. Silent fallback to fixtures on the live path: none.
+**Ship It readiness: DEPLOYED, live observation through Amazon Rekognition.** AWS-hosted frontend and API: **yes**. Live AWS
+observation of an uploaded photo: **yes**, Amazon Rekognition, verified in a real browser and with curl on the public URL
+(2026-09-20). Amazon Bedrock, the original intended observer: implemented in code, never ran successfully because the account
+was restricted, and is not on the live path. Fixture demo: separate, labelled, proven locally and on the public site.
+Silent fallback to fixtures on the live path: none.
 
 ## What we learned
 
@@ -138,8 +156,10 @@ UI verification and documentation. The tools named in the repository's own logs
 (`docs/AGENT_LOG.md`, `docs/AI_COORDINATION.md`, `docs/QA_REPORT.md`) are Antigravity, Gemini (documentation),
 Claude (implementation and a red-team resweep), Muse (tests) and opencode (UI verification scripts).
 Repository history is written under one human git identity.
-No AI model runs in the demonstrated path: the fixture adapter returns canned observations. The Bedrock
-adapter is written to call Claude on Amazon Bedrock, but it has not executed successfully.
+In the fixture demo no AI model runs: the fixture adapter returns canned observations. In the live upload path Amazon
+Rekognition, a managed computer-vision service rather than a generative model, produces the observations, and
+deterministic application code evaluates them. The Bedrock adapter is written to call Claude on Amazon Bedrock, but it
+never executed successfully.
 
 ---
 

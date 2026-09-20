@@ -1,30 +1,29 @@
 // Frontend orchestration layer. Imports the SAME logic modules the backend
 // tests run against (../../../backend/src) — there is exactly one rule
 // engine, one classifier, one fixture set, not a duplicated frontend copy.
-// bedrockAdapter.js is deliberately NOT imported here: it pulls in the AWS
-// SDK and is server/Node-side only (used by scripts/bedrock-spike.js and,
-// once deployed, a real Lambda). See observeEvidenceViaLiveBackend below for
-// how the frontend would reach it once a backend exists.
+// rekognitionAdapter.js is deliberately NOT imported here: it pulls in the AWS
+// SDK and is server/Node-side only (used by backend/server.js and the deployed
+// Lambda). See observeEvidenceViaLiveBackend below for how the frontend reaches it.
 
 export { FIXTURE_SCENARIOS, observeEvidenceViaFixture } from "../../../backend/src/fixtureAdapter.js";
 export { auditEvidence, classifyForSelection } from "../../../backend/src/auditEvidence.js";
 
 /**
- * "Production mode" adapter. There is no deployed backend yet (P1-06 is cut
- * for this event — see docs/TASK_BOARD.md), so this always fails honestly
- * with AWS_NOT_CONFIGURED instead of silently substituting fixture data.
- * Once a real backend/Lambda exists behind VITE_API_BASE_URL, this becomes
- * the live path with no other code changes required.
+ * "Production mode" adapter: POSTs the image to the backend behind
+ * VITE_API_BASE_URL, which observes it with Amazon Rekognition. Without a
+ * configured backend, or if it cannot be reached, this fails honestly with
+ * AWS_NOT_CONFIGURED instead of silently substituting fixture data; a coded
+ * backend error keeps its own code.
  *
- * @returns {Promise<{ observation: object, meta: { source: "bedrock", ... } }>}
- * @throws {Error} with `.code = "AWS_NOT_CONFIGURED"`
+ * @returns {Promise<{ observation: object, meta: { source: "amazon_rekognition", ... } }>}
+ * @throws {Error} with `.code = "AWS_NOT_CONFIGURED"` (or the backend's own error code)
  */
 export async function observeEvidenceViaLiveBackend({ imageBase64, mimeType }) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   if (!baseUrl) {
     const err = new Error(
-      "No backend/AWS integration is deployed yet. Live Bedrock status is UNKNOWN (see docs/TASK_BOARD.md P0-01/P0-02/P1-06)."
+      "No backend is configured for live observation (VITE_API_BASE_URL is not set). Live AWS status is UNKNOWN."
     );
     err.code = "AWS_NOT_CONFIGURED";
     throw err;
@@ -45,7 +44,7 @@ export async function observeEvidenceViaLiveBackend({ imageBase64, mimeType }) {
 
   if (!response.ok) {
     // backend/server.js answers every failure with { error: { code, message } }
-    // and never an observation. Keep that code: "Bedrock refused the call"
+    // and never an observation. Keep that code: "AWS refused the call"
     // (AWS_ERROR) is a different fact from "no backend configured".
     const coded = await response.json().then((body) => body?.error, () => null);
     const err = new Error(coded?.message || `Backend returned HTTP ${response.status}`);

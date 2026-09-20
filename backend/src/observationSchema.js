@@ -12,8 +12,11 @@ export const VEHICLE_TYPES = [
 ];
 
 export const HELMET_STATUSES = ["visible", "not_visible", "uncertain", "not_applicable"];
-export const IMAGE_QUALITIES = ["good", "moderate", "poor"];
-export const OCCLUSION_LEVELS = ["none", "partial", "severe"];
+// "unknown" (added for the Amazon Rekognition observer, which measures no occlusion and
+// may return no image-quality values) means "not established", NOT "none" / "good".
+// The rule engine only reacts to "poor" and "severe", so it never turns "unknown" into a verdict.
+export const IMAGE_QUALITIES = ["good", "moderate", "poor", "unknown"];
+export const OCCLUSION_LEVELS = ["none", "partial", "severe", "unknown"];
 
 function isConfidence(n) {
   return typeof n === "number" && n >= 0 && n <= 1;

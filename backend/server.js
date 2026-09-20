@@ -1,14 +1,14 @@
-// Local HTTP wrapper around the real Bedrock adapter — the missing link for the
-// live path. frontend/src/lib/audit.js POSTs { imageBase64, mimeType } to
+// Local HTTP wrapper around the live observation adapter (Amazon Rekognition) — the
+// missing link for the live path. frontend/src/lib/audit.js POSTs { imageBase64, mimeType } to
 // `${VITE_API_BASE_URL}/audit` and expects { observation, meta } back; this is
-// that endpoint. It exists so the demo can run locally (P1-06 deployment is cut).
+// that endpoint. It exists so the demo can run locally.
 //
 // Deliberately NOT here:
 //  - any fixture/mock data. This file must never import fixtureAdapter.js: if
-//    Bedrock is unavailable the caller gets a coded error, never made-up
+//    Rekognition is unavailable the caller gets a coded error, never made-up
 //    observations (docs/AI_COORDINATION.md "Product Truth"; enforced by test).
 //  - the consistency verdict. The frontend applies the deterministic rule
-//    engine to the observation; this server only relays what Bedrock saw.
+//    engine to the observation; this server only relays what Rekognition saw.
 //  - credentials. They come only from the AWS SDK default provider chain.
 //
 // Run:  npm run server            (binds 127.0.0.1:8787, override with PORT)
@@ -16,12 +16,12 @@
 
 import http from "node:http";
 import { pathToFileURL } from "node:url";
-import { observeEvidenceViaBedrock, DEFAULT_REGION, DEFAULT_MODEL_ID } from "./src/bedrockAdapter.js";
+import { observeEvidenceViaRekognition, DEFAULT_REGION } from "./src/rekognitionAdapter.js";
 import { sniffImageType } from "./src/imageType.js";
 import { redactAwsIdentifiers } from "./src/redact.js";
 
 // Sized for the DEPLOYED path, not just this local server: API Gateway HTTP API
-// (10 MB) -> Lambda synchronous request (6 MB = 6,291,556 bytes) -> Bedrock. Base64
+// (10 MB) -> Lambda synchronous request (6 MB = 6,291,556 bytes) -> Rekognition. Base64
 // inflates an image by 4/3, so a 4.6 MB photo is a 6.5 MB request that the live
 // gateway refuses (HTTP 413 {"message":"Request Entity Too Large"}) before any of
 // our code runs. A 3 MB image is a 4 MB request: clear of every layer.
@@ -106,7 +106,7 @@ export function parseAuditPayload(bodyText) {
   }
 
   // The client-supplied mimeType is only advisory (it comes from a filename
-  // extension); the bytes decide, so Bedrock never sees a mismatched media_type.
+  // extension); the bytes decide, so the observer never sees a mismatched type.
   const mimeType = sniffImageType(bytes);
   if (!mimeType) {
     throw new HttpError(415, "UNSUPPORTED_IMAGE", "Evidence must be a JPEG, PNG, WebP, or GIF image.");
@@ -126,6 +126,8 @@ async function parseAuditRequest(req) {
  */
 export function describeError(err) {
   if (err instanceof HttpError) return { status: err.status, code: err.code, message: err.message };
+  // Raised by the observer before any AWS call (e.g. WebP/GIF: Rekognition reads JPEG and PNG only).
+  if (err?.code === "UNSUPPORTED_IMAGE") return { status: 415, code: err.code, message: err.message };
   if (err?.code === "AWS_NOT_CONFIGURED") return { status: 503, code: err.code, message: redactAwsIdentifiers(err.message) };
   if (err?.code === "AWS_ERROR") return { status: 502, code: err.code, message: redactAwsIdentifiers(err.message) };
   return { status: 500, code: "INTERNAL", message: "Unexpected server error." };
@@ -133,12 +135,12 @@ export function describeError(err) {
 
 /**
  * @param {object} [options]
- * @param {typeof observeEvidenceViaBedrock} [options.observe] - injectable for tests only; the running server always uses the real adapter
+ * @param {typeof observeEvidenceViaRekognition} [options.observe] - injectable for tests only; the running server always uses the real adapter
  * @param {string[]} [options.allowedOrigins]
  * @param {(line: string) => void} [options.log]
  */
 export function createAuditServer({
-  observe = observeEvidenceViaBedrock,
+  observe = observeEvidenceViaRekognition,
   allowedOrigins = [...DEFAULT_ORIGINS, ...(process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [])],
   log = (line) => console.log(line),
 } = {}) {
@@ -162,7 +164,7 @@ export function createAuditServer({
         return;
       }
       if (req.method === "GET" && path === "/health") {
-        // Liveness of this process only. It makes no AWS call and says nothing about Bedrock.
+        // Liveness of this process only. It makes no AWS call and says nothing about Rekognition.
         send(res, 200, { status: "ok" }, cors);
         return;
       }
@@ -173,8 +175,8 @@ export function createAuditServer({
       const result = await observe({ imageBase64, mimeType });
       send(res, 200, result, cors);
       log(
-        `[audit] 200 model=${result.meta?.modelId} region=${result.meta?.region} ` +
-          `bedrockMs=${result.meta?.latencyMs} totalMs=${Date.now() - startedAt} type=${mimeType} bytes=${bytes}`
+        `[audit] 200 source=${result.meta?.source} region=${result.meta?.region} ` +
+          `observerMs=${result.meta?.latencyMs} totalMs=${Date.now() - startedAt} type=${mimeType} bytes=${bytes}`
       );
     } catch (err) {
       const { status, code, message } = describeError(err);
@@ -191,10 +193,9 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv
 if (isMain) {
   const port = Number(process.env.PORT ?? 8787);
   const region = process.env.AWS_REGION || DEFAULT_REGION;
-  const modelId = process.env.BEDROCK_MODEL_ID || DEFAULT_MODEL_ID;
   createAuditServer().listen(port, "127.0.0.1", () => {
     console.log(`ChallanCheck backend listening on http://127.0.0.1:${port}  (POST /audit, GET /health)`);
-    console.log(`Bedrock target: region=${region} model=${modelId}  — credentials via the AWS SDK default provider chain`);
+    console.log(`Observer: Amazon Rekognition DetectLabels, region=${region}  — credentials via the AWS SDK default provider chain`);
     console.log(`UI: VITE_API_BASE_URL=http://127.0.0.1:${port} npm run dev --prefix frontend`);
   });
 }

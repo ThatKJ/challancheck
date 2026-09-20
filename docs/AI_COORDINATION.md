@@ -11,10 +11,12 @@ The system does NOT determine guilt, innocence, legal validity, or legal advice.
 
 ## Architecture Contract
 
-> Status (2026-09-19): this is the design contract. The "Amazon Bedrock multimodal observation" step has never
-> completed successfully (`docs/CANONICAL_RUN.md` section 2); the demonstrated path uses the fixture adapter for
-> that step, tagged `meta.source = "fixture"`. The two "Violation extraction" and "Evidence image extraction"
-> steps are not built: the claim is typed in and one image is attached.
+> Status (2026-09-20): this is the design contract. The "Amazon Bedrock multimodal observation" step never
+> completed successfully (`docs/CANONICAL_RUN.md` section 2): the account's Bedrock access stayed restricted. On the
+> live upload path that step is performed by **Amazon Rekognition `DetectLabels`**
+> (`backend/src/rekognitionAdapter.js`, `meta.source = "amazon_rekognition"`, verified in `docs/CANONICAL_RUN.md`
+> section 2c); the fixture demo uses the fixture adapter, tagged `meta.source = "fixture"`. The two "Violation
+> extraction" and "Evidence image extraction" steps are not built: the claim is typed in and one image is attached.
 
 INPUT
 e-Challan screenshot/PDF
@@ -125,7 +127,7 @@ frontend/ (all of it — components, styles, pages/app, App.jsx, vite config)
 Must NOT change:
 
 backend logic (backend/)
-AWS integration (backend/src/bedrockAdapter.js, backend/src/fixtureAdapter.js)
+AWS integration (backend/src/rekognitionAdapter.js, backend/src/bedrockAdapter.js, backend/src/fixtureAdapter.js)
 rule engine semantics (backend/src/ruleEngine.js)
 observation schema (backend/src/observationSchema.js)
 API contracts (the function signatures/shapes documented under Protected
@@ -160,19 +162,24 @@ Do not change without updating this document.
     "text": null,
     "confidence": 0
   },
-  "image_quality": "good|moderate|poor",
-  "occlusion": "none|partial|severe",
+  "image_quality": "good|moderate|poor|unknown",
+  "occlusion": "none|partial|severe|unknown",
   "uncertainties": []
 }
 ```
 
+Changed 2026-09-20: `"unknown"` was added to `image_quality` and `occlusion`. The Amazon Rekognition observer measures no
+occlusion and may return no quality values, and "not measured" must not be recorded as `"none"` or `"good"`. The rule engine
+reacts only to `"poor"` and `"severe"`, so `"unknown"` never creates a verdict by itself. Helmet status keeps its existing
+`"uncertain"` value for "not established".
+
 ## Product Truth
 
-Bedrock observes.
+The visual observer observes: Amazon Rekognition on the live upload path (Amazon Bedrock was the original design).
 
 Deterministic application code evaluates compatibility.
 
-The LLM must never decide:
+The observer (a model or a managed service) must never decide:
 
 guilt
 innocence

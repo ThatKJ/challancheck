@@ -43,8 +43,8 @@ function observedSummary(observation, canonicalClaim) {
     return `${vehicle} · helmet ${humanize(observation.helmet?.status)}`;
   }
   const plate = observation.license_plate?.visible
-    ? `plate ${observation.license_plate.text || "visible, unreadable"}`
-    : "plate not visible";
+    ? `plate ${observation.license_plate.text || "visible, text not read"}`
+    : "plate not detected";
   return `${vehicle} · ${plate}`;
 }
 
@@ -137,7 +137,7 @@ function UploadScreen({ onSubmit, loading, error, onDismissError }) {
             <span />
           </span>
           <p>
-            Designed for Amazon Bedrock
+            Live observation by Amazon Rekognition
             <span>Visual observation, separate from rule evaluation.</span>
           </p>
         </div>
@@ -290,7 +290,7 @@ function UploadScreen({ onSubmit, loading, error, onDismissError }) {
               <p className="field-hint">
                 {mode === "fixture"
                   ? "Demo fixture — not live AWS evidence. Your source image stays attached throughout this review."
-                  : "Live observation requires a configured backend. AWS availability is not confirmed."}
+                  : "Live AWS observation · Amazon Rekognition. JPEG or PNG only."}
               </p>
             </div>
             <button
@@ -394,8 +394,8 @@ function AnalysisProgress({ stage, mode }) {
         <h2>Following the evidence.</h2>
         <p>
           {mode === "fixture"
-            ? "Non-live example · no Bedrock request is being made."
-            : "Requesting observations from the configured backend."}
+            ? "Non-live example · no AWS request is being made."
+            : "Requesting observations from Amazon Rekognition."}
         </p>
         <ol>
           {steps.map((text, index) => (
@@ -442,8 +442,8 @@ function ObservationSummary({ observation }) {
     [
       "License plate",
       observation.license_plate?.visible
-        ? observation.license_plate.text || "Visible, unreadable"
-        : "Not visible",
+        ? observation.license_plate.text || "Visible, text not read"
+        : "Not detected",
       observation.license_plate?.confidence,
     ],
     ["Image quality", observation.image_quality],
@@ -465,7 +465,7 @@ function ObservationSummary({ observation }) {
                   ? String(value ?? "Not available")
                   : humanize(value)}
               </strong>
-              {typeof confidence === "number" && (
+              {typeof confidence === "number" && confidence > 0 && (
                 <span>{Math.round(confidence * 100)}%</span>
               )}
             </dd>
@@ -506,8 +506,8 @@ function ResultScreen({ report, meta, file, claims, onOtherClaim, onBack }) {
           <span className="status-dot" />
           {meta.source === "fixture"
             ? "Demo fixture — not live AWS evidence"
-            : meta.source === "bedrock"
-              ? "Source: Amazon Bedrock"
+            : meta.source === "amazon_rekognition"
+              ? "Live AWS observation · Amazon Rekognition"
               : `Source: ${meta.source || "unknown"}`}
         </span>
       </div>
@@ -584,7 +584,9 @@ function ResultScreen({ report, meta, file, claims, onOtherClaim, onBack }) {
           <p className="observation-source">
             {meta.source === "fixture"
               ? "Observations: fixture / development mode — not model output or an analysis of the source image."
-              : "Visual observations supplied by the backend."}
+              : meta.source === "amazon_rekognition"
+                ? "Visual observations from Amazon Rekognition label detection. Rekognition observes; it does not evaluate the claim."
+                : "Visual observations supplied by the backend."}
           </p>
           <ObservationSummary observation={observation} />
           <details className="technical-details">

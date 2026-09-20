@@ -1,24 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
   ChallanCheck. API Gateway HTTP API -> one Lambda that serves both the built web
-  app and the JSON API (/api/*) -> Amazon Bedrock (Converse). Same origin, so no
-  CORS. Stateless: no database, queue or bucket at runtime. Credentials are the
-  function's IAM role only; no access keys exist anywhere.
+  app and the JSON API (/api/*) -> Amazon Rekognition (DetectLabels). Same origin,
+  so no CORS. Stateless: no database, queue or bucket at runtime. Credentials are
+  the function's IAM role only; no access keys exist anywhere.
 
 Parameters:
-  BedrockModelId:
-    Type: String
-    Default: global.anthropic.claude-sonnet-5
-    Description: >-
-      Inference-profile ID the function invokes. Must match the model the adapter
-      (backend/src/bedrockAdapter.js) builds its request for: it sends Anthropic's
-      Messages format, so this must be an Anthropic model.
-  BedrockFoundationModelId:
-    Type: String
-    Default: anthropic.claude-sonnet-5
-    Description: >-
-      Underlying foundation model behind the profile. IAM must allow InvokeModel
-      on the profile AND on this model in each region the profile routes to.
   CodeBucket:
     Type: String
     Description: Private bucket holding the function zip (created by infra/deploy.sh).
@@ -29,7 +16,7 @@ Parameters:
     Type: Number
     Default: 3
     Description: >-
-      Sustained requests/second on EACH route that can reach Bedrock (POST /api/* and
+      Sustained requests/second on EACH route that can reach Rekognition (POST /api/* and
       POST /audit; each is throttled separately) and so spend money. Abuse and cost guard.
   ApiThrottleBurstLimit:
     Type: Number
@@ -41,7 +28,7 @@ Parameters:
     Description: >-
       Sustained requests/second for everything else (static files, /api/health).
       Higher, because one page view loads several files at once; none of it
-      reaches Bedrock.
+      reaches Rekognition.
   SiteThrottleBurstLimit:
     Type: Number
     Default: 100
@@ -70,14 +57,17 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              # Converse is authorised by bedrock:InvokeModel. Scoped to one model,
-              # not bedrock:*, and not Resource "*".
-              - Sid: InvokeOneBedrockModel
+              # DetectLabels is the only Rekognition action the function calls: no
+              # rekognition:*, no RekognitionFullAccess. The API has no resource-level
+              # permissions, so Resource must be "*"; the single action and the region
+              # condition are what keep it tight. The role grants no other AWS service.
+              - Sid: DetectLabelsOnly
                 Effect: Allow
-                Action: bedrock:InvokeModel
-                Resource:
-                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
-                  - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/${BedrockFoundationModelId}
+                Action: rekognition:DetectLabels
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: !Ref AWS::Region
               - Sid: WriteOwnLogsOnly
                 Effect: Allow
                 Action:
@@ -88,7 +78,7 @@ Resources:
   ApiFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Description: ChallanCheck web app + Bedrock observation relay (the rule engine runs in the browser)
+      Description: ChallanCheck web app + Amazon Rekognition observation relay (the rule engine runs in the browser)
       Runtime: nodejs22.x
       Architectures: [arm64]
       Handler: backend/lambda.handler
@@ -100,9 +90,6 @@ Resources:
       Code:
         S3Bucket: !Ref CodeBucket
         S3Key: !Ref CodeKey
-      Environment:
-        Variables:
-          BEDROCK_MODEL_ID: !Ref BedrockModelId
       LoggingConfig:
         LogGroup: !Ref ApiLogGroup
 
@@ -121,7 +108,7 @@ Resources:
       PayloadFormatVersion: "2.0"
       TimeoutInMillis: 29000
 
-  # Two routes, one function. POST /api/* can reach Bedrock, so it gets its own,
+  # Two routes, one function. POST /api/* can reach Rekognition, so it gets its own,
   # tight throttle. Everything else (the web app's static files, /api/health)
   # falls to $default. The function owns routing and 404/405, so the same code
   # behaves identically locally and deployed.

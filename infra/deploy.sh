@@ -9,19 +9,17 @@
 # env vars). Nothing credential-shaped is read, written or echoed by this script.
 #
 # Overrides (all optional):
-#   AWS_REGION  STACK_NAME  BEDROCK_MODEL_ID  BEDROCK_FOUNDATION_MODEL_ID
+#   AWS_REGION  STACK_NAME
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REGION="${AWS_REGION:-ap-south-1}"
 STACK="${STACK_NAME:-challancheck-api}"
-MODEL_ID="${BEDROCK_MODEL_ID:-global.anthropic.claude-sonnet-5}"
-FOUNDATION_MODEL_ID="${BEDROCK_FOUNDATION_MODEL_ID:-anthropic.claude-sonnet-5}"
 
 echo "== identity =="
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 aws sts get-caller-identity --query Arn --output text | sed -E 's/^/caller: /'
-echo "region: ${REGION}   stack: ${STACK}   model: ${MODEL_ID}"
+echo "region: ${REGION}   stack: ${STACK}   observer: Amazon Rekognition DetectLabels"
 
 BUCKET="challancheck-artifacts-${ACCOUNT}-${REGION}"
 echo "== artifact bucket (private) =="
@@ -85,8 +83,6 @@ aws cloudformation deploy ${EXECUTE_FLAG} \
   --capabilities CAPABILITY_IAM \
   --no-fail-on-empty-changeset \
   --parameter-overrides \
-    "BedrockModelId=${MODEL_ID}" \
-    "BedrockFoundationModelId=${FOUNDATION_MODEL_ID}" \
     "CodeBucket=${BUCKET}" \
     "CodeKey=${KEY}"
 
@@ -108,7 +104,7 @@ for p in /health /api/health; do
 done
 curl -sS --max-time 20 "${SITE_URL}/health"
 echo
-echo "== smoke: GET /audit is a coded JSON 405, never HTML (no Bedrock call) =="
+echo "== smoke: GET /audit is a coded JSON 405, never HTML (no AWS call) =="
 got="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{content_type}' "${SITE_URL}/audit")"
 echo "GET /audit -> ${got}"
 case "${got}" in "405 application/json"*) ;; *) echo "FAIL: GET /audit must be 405 application/json" >&2; exit 1 ;; esac

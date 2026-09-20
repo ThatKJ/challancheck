@@ -1,13 +1,13 @@
 # Canonical Run
 
-**Submission mode: B — AWS NOT VERIFIED.** Amazon Bedrock has not returned a successful
-response for this project. Everything labelled `fixture` below is a canned local observation
-and is never Bedrock output. Section 2 is the exact record of the last live attempt.
+**Submission mode: LIVE AWS OBSERVATION THROUGH AMAZON REKOGNITION (Amazon Bedrock blocked)**, as of 2026-09-20.
+Amazon Bedrock, the original intended observer, has not returned a successful response for this project (sections 2
+and 2b, 2026-09-19): AWS Support confirmed that the newly created account had temporary service and model
+restrictions. The final live upload path uses Amazon Rekognition `DetectLabels`, and section 2c is the exact record of
+verifying it on the public deployment. Everything labelled `fixture` below is a canned local observation and is never
+live output; no fixture ever stands in for the live path.
 
-**MODE B + DEPLOYED AWS SHELL.** A public site and API are deployed on AWS (section 2b). Bedrock is still
-refused through them, and no fixture ever stands in for it on the live path.
-
-## 1. Mode B run — what the demo shows
+## 1. Fixture demo run — what "Explore an example" shows
 
 | | |
 |---|---|
@@ -43,7 +43,7 @@ An earlier version of this file reported "Total Request Latency: 28 ms". That wa
 submit-to-result timing of local JavaScript (QA RED-013), not a request latency, so it is no
 longer presented as one.
 
-## 2. Live AWS attempt — 2026-09-19, about 14:23 UTC
+## 2. Live Bedrock attempt — 2026-09-19, about 14:23 UTC (historical)
 
 ```
 AWS IDENTITY:          resolves — the team's AWS account (id omitted), short-lived `aws login` credentials
@@ -103,7 +103,14 @@ project notes called this "verification / propagation delay"; the evidence above
 that explanation. We have not been able to lift the quota ourselves. Other models and regions were
 tried in earlier sessions with the same error (`docs/TASK_BOARD.md` P0-01) and were not re-run here.
 
+**Update, 2026-09-20.** AWS Support confirmed that the newly created account had temporary restrictions on some
+services and model access. They were not lifted during the event, so the live path now uses Amazon Rekognition (section 2c).
+
 ## 2b. Deployed AWS shell — final verification, 2026-09-19 about 19:50 UTC (2026-09-20 01:20 IST)
+
+> **Historical record, superseded by section 2c.** This is the Bedrock-era verification at commit `110e283`. The stack has since
+> been updated in place to the Rekognition observer, so the Lambda, IAM, health-body and "Bedrock refuses it" details below no longer
+> describe what is deployed.
 
 ```
 MODE:                  B + DEPLOYED AWS SHELL   (live Bedrock analysis: BLOCKED)
@@ -200,17 +207,161 @@ the deployed bundle does not contain the fixture adapter, and tests assert the e
 - Web fonts are not shipped: the page renders in the system font (the declared `Inter` is only used if installed).
 - Verified in Chrome, not an incognito window; no other browser was tried.
 
-## 3. What flips the project to Mode A
+## 2c. Live AWS observation through Amazon Rekognition — 2026-09-20 (current deployment)
 
-All of the following must be true, in this order. Until then the README, submission and demo stay in Mode B.
+```
+MODE:                  LIVE AWS OBSERVATION THROUGH AMAZON REKOGNITION   (Amazon Bedrock: not used; blocked)
+PUBLIC URL:            https://5941vqrwm1.execute-api.ap-south-1.amazonaws.com   (site and API, same origin)
+REGION:                ap-south-1
+CODE:                  the commit that adds backend/src/rekognitionAdapter.js. Lambda CodeSha256
+                       eQKrQa73e8xF3iNJRxRn8kw6Qwzc9DEuuPGrgu/YhFg= (the deployed zip, downloaded, hashes to the same value)
+STACK:                 CloudFormation `challancheck-api`, UPDATE_COMPLETE 2026-09-20 13:37 UTC, updated in place from a
+                       previewed change set: 3 modify (ApiFunction, FunctionRole, Integration), 0 add, 0 replace, 0 remove
+LAMBDA:                nodejs22.x, arm64, 512 MB, 28 s, handler backend/lambda.handler, no environment variables
+IAM:                   inline policy `least-privilege-runtime`: rekognition:DetectLabels (Resource "*", because the API has no
+                       resource-level permissions; condition aws:RequestedRegion = ap-south-1) and logs:CreateLogStream /
+                       logs:PutLogEvents on its own log group. No managed policies. Nothing on Bedrock.
+PHOTO:                 demo_image.png, PNG, 2,252,978 bytes: a grey car with a driver in sunglasses and an auto-rickshaw at
+                       the frame's left edge. No motorcyclist and no helmet in it. A local file, deliberately not committed:
+                       its provenance and licence are unconfirmed, and it shows a real person and a legible licence plate.
+```
 
-1. `npm run check:bedrock-text` exits 0 (a real text response).
+**1. Direct call, before any code change.** `aws rekognition detect-labels --region ap-south-1 --image-bytes fileb://demo_image.png
+--features GENERAL_LABELS IMAGE_PROPERTIES --min-confidence 70 --max-labels 30`: exit 0, request id
+`3b4b2574-7196-45e5-a9c6-c2b4113c7ed6`, label model 3.0, 21 labels. `IMAGE_PROPERTIES`: Brightness 64.3,
+Sharpness 80.7, Contrast 79.6 (each 0 to 100).
+
+| Label | Confidence % | Instances |
+|---|---|---|
+| Car | 99.67 | 2 |
+| Transportation | 99.67 | 0 |
+| Vehicle | 99.67 | 0 |
+| Accessories | 98.34 | 0 |
+| Glasses | 98.34 | 1 |
+| Person | 97.56 | 4 |
+| Machine | 97.55 | 0 |
+| Wheel | 97.55 | 5 |
+| Adult | 97.43 | 1 |
+| Male | 97.43 | 1 |
+| Man | 97.43 | 1 |
+| Motorcycle | 94.61 | 1 |
+| Windshield | 89.09 | 0 |
+| Alloy Wheel | 86.31 | 0 |
+| Car Wheel | 86.31 | 0 |
+| Spoke | 86.31 | 0 |
+| Tire | 86.31 | 0 |
+| Bumper | 85.35 | 0 |
+| Face | 81.39 | 0 |
+| Head | 81.39 | 0 |
+| License Plate | 72.47 | 1 |
+
+The Car label has two instances (one covers 53.6% of the frame, one 2.3%). The single **Motorcycle** instance covers 3.4% of the
+frame and sits at the left edge (`Left` = 0), where the auto-rickshaw is: Rekognition labelled that vehicle a motorcycle at 94.6%.
+There is no Helmet label in the response.
+
+**2. Deploy.** `PREVIEW=1 bash infra/deploy.sh` built the bundle, scanned it for secrets and created the change set (no add, replace or
+remove); that exact change set was then executed. Smoke checks on the public URL: `GET /` 200 `text/html`; `GET /health` and
+`GET /api/health` 200 `application/json` (`{"status":"ok","service":"challancheck-api","mode":"live","fixtures":false,"region":"ap-south-1","observer":"amazon_rekognition"}`);
+`GET /audit` 405 coded JSON; `POST /report` 405.
+
+**3. Public `POST /audit` (API root route), curl, same photo.** HTTP 200 `application/json`, 2.54 s wall time for a 3,004,013-byte
+request; `meta.source` = `amazon_rekognition`, `meta.latencyMs` = 957 (the Rekognition call inside the Lambda), `meta.labels` = the same
+21 labels and confidences as the direct call. The observation returned:
+
+```json
+{
+  "vehicle_type": {
+    "value": "unknown",
+    "confidence": 0
+  },
+  "people_visible": {
+    "value": 4,
+    "confidence": 0.8842
+  },
+  "helmet": {
+    "status": "uncertain",
+    "confidence": 0
+  },
+  "license_plate": {
+    "visible": true,
+    "text": null,
+    "confidence": 0.7247
+  },
+  "image_quality": "good",
+  "occlusion": "unknown",
+  "uncertainties": [
+    "More than one vehicle type detected (car 99.7%, motorcycle 94.6%), so the vehicle the claim refers to cannot be identified.",
+    "People count is the number of detected Person instances; it does not separate the subject from bystanders.",
+    "Helmet use is not established: Amazon Rekognition label detection did not report a helmet at the head of every detected person. This is not evidence that no helmet is worn.",
+    "License plate text is not read; label detection does not read text.",
+    "Occlusion is not assessed by Amazon Rekognition label detection."
+  ]
+}
+```
+
+**4. Public web app, real browser** (Chrome driven by Playwright, 1440 x 900): Upload evidence, claim "Riding without helmet",
+`demo_image.png`, Review evidence. Exactly one same-origin `POST /api/audit` (HTTP 200, `latencyMs` 700), no external requests, no console or
+page errors; the observation was identical to step 3. The report: badge "Live AWS observation · Amazon Rekognition"; deterministic
+conclusion **Insufficient Evidence**; Claimed "Riding Without Helmet", Observed "unknown · helmet uncertain"; rows Vehicle type
+Unknown, Helmet Uncertain, People visible 4 (88%), License plate "Visible, text not read" (72%), Image quality Good, Occlusion Unknown;
+the five uncertainties above; technical record `INSUFFICIENT_EVIDENCE` / `WITHOUT_HELMET` / `amazon_rekognition`.
+
+Why Insufficient Evidence: Car (99.7%) and Motorcycle (94.6%) are both above the 70% floor, so the adapter cannot tell which vehicle the
+claim refers to and reports `vehicle_type` as `unknown` with confidence 0; the unchanged rule engine's confidence gate then refuses a
+verdict. The reason line the engine prints ("Vehicle type classification confidence (0) is too low to trust for a verdict.") quotes that
+gate; the actual cause is the first line under "What remains uncertain".
+
+**5. Independent evidence that Rekognition ran and Bedrock did not.**
+
+- The returned observation equals the pure normalization of the step 1 response (deep equality), and `meta.labels` equals the step 1 labels.
+- CloudWatch Logs since the deploy: two structured `/audit` lines, `2026-09-20T13:40:04Z` and `13:40:52Z`, both `"status":200,"source":"amazon_rekognition","bytes":2252978`, with
+  `observerMs` 957 and 700; no line mentions Bedrock and none is an error.
+- CloudTrail: `DetectLabels` by the assumed role `challancheck-api-ApiFunction-...` at 2026-09-20 19:10:04 IST (= 13:40:04Z, the curl call; the browser call was not yet
+  visible, event history lags), and by Root at 18:51:43 IST (the step 1 CLI call).
+- The deployed zip was downloaded: its SHA-256 equals the function's `CodeSha256`; its `backend/` is identical to the repository except the
+  deliberately removed `fixtureAdapter.js` and the un-bundled `textTest.js`; its `public/` is identical to the built `frontend/dist`;
+  `lambda.js` and `server.js` import only `rekognitionAdapter.js`. `backend/src/bedrockAdapter.js` and the Bedrock SDK still ship in the zip, but nothing imports them.
+
+**Bedrock calls on the live path: zero.** The evidence is (a) the entry points do not import the Bedrock adapter (a test, and the deployed files), (b) the role has no
+`bedrock:*` permission, so an attempt would fail with AccessDenied and be logged, and (c) the logs contain no Bedrock line and no error. CloudTrail is not used as proof: it
+does not record Bedrock `InvokeModel` (a data event) by default. No Bedrock call was made from the development machine in this work either: the test suite was run without
+AWS credentials, so the one real-AWS test in `tests/unit/bedrockAdapter.test.js` took its credentials-missing branch.
+
+**Latency.** The Rekognition call took 957 ms and 700 ms inside the Lambda (n = 2; cold and warm starts are not distinguished), so this is not a benchmark.
+
+**Known limitations of this path**
+
+- Rekognition establishes no helmet use, plate text or occlusion. A helmet claim can only end `INSUFFICIENT_EVIDENCE`, or `OBSERVABLE_INCONSISTENCY` when a helmet is detected
+  at the head of every detected person (or for a helmet-exempt vehicle); the adapter never emits `not_visible`, so `CONSISTENT_WITH_EVIDENCE` cannot come from a missing label.
+- One live photo (a car scene) has been run. No motorcycle or helmet photo was tested live; the helmet mapping is tested against synthetic responses only.
+- The image-quality thresholds are uncalibrated heuristics on Rekognition's brightness and sharpness values; they only make results more cautious.
+- Rekognition reads JPEG and PNG only; a WebP or GIF is refused with a coded HTTP 415 before any AWS call.
+- Rekognition's labels are not always right (it called the auto-rickshaw a motorcycle here). The "two vehicle types give an unknown vehicle" rule is what stopped a possibly wrong verdict.
+- The API is public and unauthenticated; it is throttled at 3 requests per second (burst 6) on each route that can reach Rekognition.
+
+**Verification snapshot, 2026-09-20** (the working tree that was deployed, plus these docs)
+
+| Check | Result |
+|---|---|
+| `npm test` | 14 files, 217 tests pass: the 155 pre-existing tests unchanged, plus 62 new ones in `tests/unit/rekognitionAdapter.test.js`. Run without AWS credentials in the environment |
+| `npm run build --prefix frontend` (with `VITE_API_BASE_URL=/api`) | pass (vite 8.3.0) |
+| `npm run lint --prefix frontend` (oxlint) | pass |
+| Typecheck | none: the project has no typecheck script and no TypeScript |
+| `sh scripts/verification/secret_scan.sh` | exit 0 |
+| `git diff --check` | exit 0 |
+| Lambda bundle | `npm ci --omit=dev` from the updated lockfile installs 29 packages, zip 2.9 MB; the bundled handler starts without the fixture adapter |
+
+## 3. What flips the project to Mode A (Bedrock verified)
+
+All of the following must be true, in this order. Until then the README, submission and demo describe the Rekognition live path and never claim Bedrock output.
+
+1. `npm run check:bedrock-text` exits 0 (a real Bedrock text response).
 2. A real image sent to `POST /audit` (locally, or on the deployed URL, where `POST /api/audit` is the same handler) returns a schema-valid observation with `meta.source: "bedrock"`.
 3. `npm test` is still green, and one real observation passes through `evaluateConsistency`.
 4. Section 1 is replaced with that run's model, region, latency and observation.
 5. `docs/SUBMISSION.md` and `docs/DEMO.md` switch to their Mode A copy.
 
-## 4. Verification snapshot (final deployment verification, 2026-09-19 about 19:50 UTC, commit 110e283 plus docs)
+## 4. Verification snapshot (Bedrock-era final deployment verification, 2026-09-19 about 19:50 UTC, commit 110e283 plus docs; the 2026-09-20 snapshot is at the end of section 2c)
 
 | Check | Result |
 |---|---|

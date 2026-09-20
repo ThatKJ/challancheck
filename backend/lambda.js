@@ -1,12 +1,12 @@
 // AWS Lambda entry point behind an API Gateway HTTP API (payload format 2.0).
 // A thin wrapper: request validation and error mapping come from backend/server.js
 // (the same functions the local server uses), and the observation comes from the
-// same Bedrock adapter. There is no rule engine, schema or fixture logic here.
+// same Amazon Rekognition adapter. There is no rule engine or fixture logic here.
 // In this product the deterministic rule engine runs in the browser and this
-// function only relays what Bedrock observed.
+// function only relays what Rekognition observed.
 //
 // One function serves the whole product on ONE origin, so there is no CORS:
-//   GET  /health, /api/health   liveness + region/model; makes no AWS call
+//   GET  /health, /api/health   liveness + region/observer; makes no AWS call
 //   POST /audit,  /api/audit    { imageBase64, mimeType } -> { observation, meta }  (or a coded error)
 //   GET/HEAD anything else      the built web app (src/staticSite.js)
 // The un-prefixed paths mirror the local server (backend/server.js) and the frontend's
@@ -14,20 +14,22 @@
 // app calls (VITE_API_BASE_URL=/api). Both are the SAME handler code.
 //
 // Deliberately NOT here:
-//  - any fixture/mock data: if Bedrock is unavailable the caller gets a coded
+//  - any fixture/mock data: if Rekognition is unavailable the caller gets a coded
 //    error with a non-2xx status, never made-up observations (enforced by test).
 //  - credentials: the function uses its IAM execution role via the SDK default
 //    provider chain; nothing credential-shaped is read or returned.
-//  - an unthrottled path to Bedrock: every route that can reach it (POST /audit and
+//  - an unthrottled path to Rekognition: every route that can reach it (POST /audit and
 //    POST /api/*) is its own API Gateway route with the tight throttle, so the looser
-//    static-file throttle on $default can never be used to spend Bedrock tokens
+//    static-file throttle on $default can never be used to spend Rekognition calls
 //    (infra/template.yaml, guarded by tests/unit/lambda.test.js).
+//  - any Bedrock code: nothing on this path imports the Bedrock adapter, and the
+//    function's IAM role grants no bedrock:* action (both guarded by tests).
 //  - a health check that lies: an unknown extensionless path falls through to the
 //    single-page app, so /health and /audit MUST be matched before the static handler.
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { observeEvidenceViaBedrock, DEFAULT_REGION, DEFAULT_MODEL_ID } from "./src/bedrockAdapter.js";
+import { observeEvidenceViaRekognition, DEFAULT_REGION, OBSERVER_SOURCE } from "./src/rekognitionAdapter.js";
 import { createStaticSite } from "./src/staticSite.js";
 import { redactAwsIdentifiers } from "./src/redact.js";
 import { parseAuditPayload, describeError } from "./server.js";
@@ -50,11 +52,11 @@ const errorBody = (code, message) => ({ error: { code, message } });
 
 /**
  * @param {object} [options]
- * @param {typeof observeEvidenceViaBedrock} [options.observe] - injectable for tests only; the deployed function always uses the real adapter
+ * @param {typeof observeEvidenceViaRekognition} [options.observe] - injectable for tests only; the deployed function always uses the real adapter
  * @param {Function} [options.site] - static-site handler; injected in tests
  * @param {(line: string) => void} [options.log]
  */
-export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site, log = (line) => console.log(line) } = {}) {
+export function createLambdaHandler({ observe = observeEvidenceViaRekognition, site, log = (line) => console.log(line) } = {}) {
   /** @param {import("aws-lambda").APIGatewayProxyEventV2} event */
   return async function handler(event) {
     const startedAt = Date.now();
@@ -63,14 +65,14 @@ export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site,
 
     if (rawPath === "/health" || rawPath === "/api/health") {
       if (method !== "GET") return json(405, errorBody("METHOD_NOT_ALLOWED", "Use GET."), { allow: "GET" });
-      // Liveness only: no AWS call, and nothing about the account, credentials or Bedrock access.
+      // Liveness only: no AWS call, and nothing about the account, credentials or AWS access.
       return json(200, {
         status: "ok",
         service: "challancheck-api",
         mode: "live",
         fixtures: false,
         region: process.env.AWS_REGION || DEFAULT_REGION,
-        modelId: process.env.BEDROCK_MODEL_ID || DEFAULT_MODEL_ID,
+        observer: OBSERVER_SOURCE,
       });
     }
 
@@ -83,8 +85,8 @@ export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site,
         const result = await observe({ imageBase64, mimeType });
         log(
           JSON.stringify({
-            level: "info", route: "/audit", status: 200, bedrockMs: result.meta?.latencyMs ?? null,
-            totalMs: Date.now() - startedAt, modelId: result.meta?.modelId ?? null, region: result.meta?.region ?? null, type: mimeType, bytes,
+            level: "info", route: "/audit", status: 200, source: result.meta?.source ?? null, observerMs: result.meta?.latencyMs ?? null,
+            totalMs: Date.now() - startedAt, region: result.meta?.region ?? null, type: mimeType, bytes,
           })
         );
         return json(200, result);
@@ -103,8 +105,7 @@ export function createLambdaHandler({ observe = observeEvidenceViaBedrock, site,
   };
 }
 
-// Built once per container so warm invocations reuse the Bedrock client and the
-// in-memory file cache. `public/` sits beside `backend/` in the deployment bundle
+// Built once per container so warm invocations reuse the in-memory file cache. `public/` sits beside `backend/` in the deployment bundle
 // (infra/deploy.sh); when it is absent every non-API path is a plain 404.
 const publicDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../public");
 export const handler = createLambdaHandler({ site: createStaticSite({ rootDir: publicDir }) });

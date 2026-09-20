@@ -68,7 +68,7 @@ export function ErrorBlock({ error, onDismiss }) {
           Your inputs are preserved. You can retry or choose a labeled example.
         </small>
         {error.code?.startsWith("AWS") && (
-          <p className="mono">Live AWS / Bedrock status: UNKNOWN</p>
+          <p className="mono">Live AWS / Amazon Rekognition status: UNKNOWN</p>
         )}
       </div>
       <button
