@@ -17,3 +17,16 @@ aws-credentials*
 .idea
 .DS_Store
 *.log
+
+# Media / Recording / Automation
+*.mp4
+*.mov
+*.webm
+*.srt
+coverage/
+tmp/
+.playwright-mcp/
+
+# Canonical evidence photos — kept local, never committed (see README/DEMO.md).
+demo_image.png
+frontend/public/evidence-photo-*.jpg
